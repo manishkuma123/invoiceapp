@@ -146,14 +146,37 @@ state: {
 
 const Organization = mongoose.model('Organization', organizationSchema);
 
+// const transporter = nodemailer.createTransport({
+//   service: 'gmail',
+//   auth: {
+//     user: process.env.EMAIL_USER,
+//     pass: process.env.EMAIL_PASS
+//   }
+// });
+
+
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // use SSL
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+    pass: process.env.EMAIL_PASS // Must be App Password
+  },
+  tls: {
+    rejectUnauthorized: false
   }
 });
 
+
+transporter.verify((error, success) => {
+  if (error) {
+    console.error('❌ Email configuration error:', error);
+    console.log('Please check EMAIL_USER and EMAIL_PASS environment variables');
+  } else {
+    console.log('✅ Email server ready to send messages');
+  }
+});
 async function sendOTPEmail(email, otp, purpose) {
   const subject = purpose === 'signup' 
     ? 'Your OTP for Signup - Invoice App' 
