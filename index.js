@@ -23,8 +23,8 @@ app.use(express.json());
 app.use(cors());
 
 app.use('/api/organization/businesstype/category',categoryroutes )
-let db = "mongodb+srv://manishpdotpitchtechnologies_db_user:2PkhDVk8dfnmjMud@cluster0.ihrxtdj.mongodb.net/invoicedata";
-
+// let db = "mongodb+srv://manishpdotpitchtechnologies_db_user:2PkhDVk8dfnmjMud@cluster0.ihrxtdj.mongodb.net/invoicedata";
+let db = "mongodb+srv://manishpdotpitchtechnologies_db_user:2PkhDVk8dfnmjMud@cluster0.ihrxtdj.mongodb.net/invoicedata?retryWrites=true&w=majority";
 mongoose.connect(process.env.MONGODB_URI || db)
   .then(() => console.log('✅ MongoDB connected successfully'))
   .catch(err => console.error('❌ MongoDB connection error:', err));
@@ -68,13 +68,7 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     trim: true
   },
-  password: { 
-    type: String 
-  },
-  name: { 
-    type: String,
-    trim: true
-  },
+
   isVerified: { 
     type: Boolean, 
     default: false 
@@ -314,7 +308,7 @@ app.post('/api/auth/signup/send-otp', async (req, res) => {
 
 app.post('/api/auth/signup/verify-otp', async (req, res) => {
   try {
-    const { email, otp, password, name } = req.body;
+    const { email, otp } = req.body;
 
     if (!email || !otp) {
       return res.status(400).json({ 
@@ -350,15 +344,11 @@ app.post('/api/auth/signup/verify-otp', async (req, res) => {
       });
     }
 
-    let hashedPassword = null;
-    if (password) {
-      hashedPassword = await bcrypt.hash(password, 10);
-    }
+   
 
     const newUser = new User({
       email: email.toLowerCase(),
-      password: hashedPassword,
-      name: name || '',
+      
       isVerified: true
     });
 
