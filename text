@@ -1,0 +1,323 @@
+
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+require('dotenv').config();
+
+const app = express();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// MongoDB Connection
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/client_db', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => console.log('MongoDB Connected'))
+.catch(err => console.error('MongoDB Connection Error:', err));
+
+// Client Schema
+const clientSchema = new mongoose.Schema({
+  // Step 1: Customer Information
+  firstName: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  lastName: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  businessName: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  emailAddress: {
+    type: String,
+    required: true,
+    trim: true,
+    lowercase: true,
+    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email']
+  },
+  mobileNumber: {
+    countryCode: {
+      type: String,
+      default: '+91'
+    },
+    number: {
+      type: String,
+      required: true
+    }
+  },
+  tax: {
+    type: String,
+    trim: true
+  },
+  
+  // Step 2: Billing Address
+  billingAddress: {
+    country: {
+      type: String,
+      required: true
+    },
+    addressLine1: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    addressLine2: {
+      type: String,
+      trim: true
+    },
+    townCity: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    state: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    pinCode: {
+      type: String,
+      required: true,
+      trim: true
+    }
+  },
+  
+  // Step 3: Delivery Address
+  sameAsBilling: {
+    type: Boolean,
+    default: false
+  },
+  deliveryAddress: {
+    firstName: String,
+    lastName: String,
+    businessName: String,
+    country: String,
+    addressLine1: String,
+    addressLine2: String,
+    townCity: String,
+    state: String,
+    pinCode: String
+  },
+  
+  // Step 4: Others
+  country: {
+    type: String,
+    required: true
+  },
+  language: {
+    type: String,
+    required: true
+  },
+  note: {
+    type: String,
+    trim: true
+  },
+  
+  // Metadata
+  status: {
+    type: String,
+    enum: ['active', 'inactive', 'pending'],
+    default: 'active'
+  }
+}, {
+  timestamps: true
+});
+
+const Client = mongoose.model('Client', clientSchema);
+
+// Routes
+
+// Create new client
+app.post('/api/clients', async (req, res) => {
+  try {
+    const client = new Client(req.body);
+    await client.save();
+    res.status(201).json({
+      success: true,
+      message: 'Client created successfully',
+      data: client
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: 'Error creating client',
+      error: error.message
+    });
+  }
+});
+
+// Get all clients
+app.get('/api/clients', async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search, status } = req.query;
+    
+    const query = {};
+    if (search) {
+      query.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { businessName: { $regex: search, $options: 'i' } },
+        { emailAddress: { $regex: search, $options: 'i' } }
+      ];
+    }
+    if (status) {
+      query.status = status;
+    }
+    
+    const clients = await Client.find(query)
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ createdAt: -1 });
+    
+    const count = await Client.countDocuments(query);
+    
+    res.json({
+      success: true,
+      data: clients,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+      totalClients: count
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching clients',
+      error: error.message
+    });
+  }
+});
+
+// Get single client by ID
+app.get('/api/clients/:id', async (req, res) => {
+  try {
+    const client = await Client.findById(req.params.id);
+    if (!client) {
+      return res.status(404).json({
+        success: false,
+        message: 'Client not found'
+      });
+    }
+    res.json({
+      success: true,
+      data: client
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching client',
+      error: error.message
+    });
+  }
+});
+
+// Update client
+app.put('/api/clients/:id', async (req, res) => {
+  try {
+    const client = await Client.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+    
+    if (!client) {
+      return res.status(404).json({
+        success: false,
+        message: 'Client not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Client updated successfully',
+      data: client
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: 'Error updating client',
+      error: error.message
+    });
+  }
+});
+
+// Delete client
+app.delete('/api/clients/:id', async (req, res) => {
+  try {
+    const client = await Client.findByIdAndDelete(req.params.id);
+    
+    if (!client) {
+      return res.status(404).json({
+        success: false,
+        message: 'Client not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Client deleted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting client',
+      error: error.message
+    });
+  }
+});
+
+// Update client status
+app.patch('/api/clients/:id/status', async (req, res) => {
+  try {
+    const { status } = req.body;
+    
+    if (!['active', 'inactive', 'pending'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status value'
+      });
+    }
+    
+    const client = await Client.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    );
+    
+    if (!client) {
+      return res.status(404).json({
+        success: false,
+        message: 'Client not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Client status updated successfully',
+      data: client
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error updating status',
+      error: error.message
+    });
+  }
+});
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', message: 'Server is running' });
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
