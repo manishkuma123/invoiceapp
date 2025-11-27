@@ -1,29 +1,26 @@
-// const express = require('express');
-// const cors = require('cors');
-// const mongoose =require("mongoose")
-// require('dotenv').config();
 
-
- 
 const express = require('express');
 const upload = require("./config/upload");
 const mongoose = require('mongoose');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 const multer = require('multer');
 const path = require('path');
 require('dotenv').config();
+
 const app = express();
 const PORT = process.env.PORT || 6000;
-const  categoryroutes = require('./routes/Category')
+const categoryroutes = require('./routes/Category');
 const Category = require("./schema/Category");
+
 app.use(express.json());
 app.use(cors());
 
-app.use('/api/organization/businesstype/category',categoryroutes )
-// let db = "mongodb+srv://manishpdotpitchtechnologies_db_user:2PkhDVk8dfnmjMud@cluster0.ihrxtdj.mongodb.net/invoicedata";
+app.use('/api/organization/businesstype/category', categoryroutes);
+
+// MongoDB Connection
 let db = "mongodb+srv://manishpdotpitchtechnologies_db_user:2PkhDVk8dfnmjMud@cluster0.ihrxtdj.mongodb.net/invoicedata?retryWrites=true&w=majority";
 mongoose.connect(process.env.MONGODB_URI || db)
   .then(() => console.log('✅ MongoDB connected successfully'))
@@ -32,6 +29,8 @@ mongoose.connect(process.env.MONGODB_URI || db)
 app.get('/', (req, res) => {
   res.send('Hello World!');
 });
+
+// ==================== SCHEMAS ====================
 
 const otpSchema = new mongoose.Schema({
   email: { 
@@ -59,7 +58,6 @@ const otpSchema = new mongoose.Schema({
 
 const OTP = mongoose.model('OTP', otpSchema);
 
-
 const userSchema = new mongoose.Schema({
   email: { 
     type: String, 
@@ -68,7 +66,6 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     trim: true
   },
-
   isVerified: { 
     type: Boolean, 
     default: false 
@@ -80,7 +77,6 @@ const userSchema = new mongoose.Schema({
 });
 
 const User = mongoose.model('User', userSchema);
-
 
 const organizationSchema = new mongoose.Schema({
   userId: { 
@@ -94,22 +90,12 @@ const organizationSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
-  
-//   organizationType: { 
-//     type: String,
-//     trim: true
-//   },
-//   businessType: { 
-//     type: String,
-//     trim: true
-//   },
-    businessType: { 
+  businessType: { 
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category',
     required: true
   },
-
-state: { 
+  state: { 
     type: String,
     trim: true
   },
@@ -146,37 +132,30 @@ state: {
 
 const Organization = mongoose.model('Organization', organizationSchema);
 
-// const transporter = nodemailer.createTransport({
-//   service: 'gmail',
-//   auth: {
-//     user: process.env.EMAIL_USER,
-//     pass: process.env.EMAIL_PASS
-//   }
-// });
+// ==================== SENDGRID CONFIGURATION ====================
 
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // use SSL
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS // Must be App Password
-  },
-  tls: {
-    rejectUnauthorized: false
+// Verify SendGrid configuration on startup
+async function verifySendGridConfig() {
+  if (!process.env.SENDGRID_API_KEY) {
+    console.error('❌ SENDGRID_API_KEY not found in environment variables');
+    console.log('Please add SENDGRID_API_KEY to your .env file');
+    return false;
   }
-});
-
-
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('❌ Email configuration error:', error);
-    console.log('Please check EMAIL_USER and EMAIL_PASS environment variables');
-  } else {
-    console.log('✅ Email server ready to send messages');
+  if (!process.env.SENDGRID_FROM_EMAIL) {
+    console.error('❌ SENDGRID_FROM_EMAIL not found in environment variables');
+    console.log('Please add SENDGRID_FROM_EMAIL to your .env file');
+    return false;
   }
-});
+  console.log('✅ SendGrid configuration loaded successfully');
+  console.log(`📧 Emails will be sent from: ${process.env.SENDGRID_FROM_EMAIL}`);
+  return true;
+}
+
+verifySendGridConfig();
+
+// Send OTP Email using SendGrid
 async function sendOTPEmail(email, otp, purpose) {
   const subject = purpose === 'signup' 
     ? 'Your OTP for Signup - Invoice App' 
@@ -186,9 +165,9 @@ async function sendOTPEmail(email, otp, purpose) {
     ? 'Welcome! Complete Your Signup' 
     : 'Login Verification';
   
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
+  const msg = {
     to: email,
+    from: process.env.SENDGRID_FROM_EMAIL,
     subject: subject,
     html: `
       <!DOCTYPE html>
@@ -223,7 +202,6 @@ async function sendOTPEmail(email, otp, purpose) {
               ❓ If you didn't request this code, please ignore this email.
             </p>
           </div>
-         
         </div>
       </body>
       </html>
@@ -231,11 +209,14 @@ async function sendOTPEmail(email, otp, purpose) {
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    await sgMail.send(msg);
     console.log(`✅ OTP email sent to ${email}`);
     return true;
   } catch (error) {
-    console.error('❌ Email sending error:', error);
+    console.error('❌ SendGrid email error:', error);
+    if (error.response) {
+      console.error('SendGrid error details:', error.response.body);
+    }
     return false;
   }
 }
@@ -244,6 +225,7 @@ function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+// ==================== MIDDLEWARE ====================
 
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -268,6 +250,7 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// ==================== AUTH ROUTES - SIGNUP ====================
 
 app.post('/api/auth/signup/send-otp', async (req, res) => {
   try {
@@ -367,11 +350,8 @@ app.post('/api/auth/signup/verify-otp', async (req, res) => {
       });
     }
 
-   
-
     const newUser = new User({
       email: email.toLowerCase(),
-      
       isVerified: true
     });
 
@@ -463,6 +443,8 @@ app.post('/api/auth/signup/resend-otp', async (req, res) => {
     });
   }
 });
+
+// ==================== AUTH ROUTES - LOGIN ====================
 
 app.post('/api/auth/login/send-otp', async (req, res) => {
   try {
@@ -650,6 +632,8 @@ app.post('/api/auth/login/resend-otp', async (req, res) => {
   }
 });
 
+// ==================== ORGANIZATION ROUTES ====================
+
 app.post('/api/organization/setup', authenticateToken, upload.fields([
   { name: "signature", maxCount: 1 },
   { name: "companySealing", maxCount: 1 },
@@ -658,8 +642,6 @@ app.post('/api/organization/setup', authenticateToken, upload.fields([
   try {
     const {
       organizationName,
-    //   organizationType,
-
       businessType,
       state,
       location,
@@ -690,7 +672,6 @@ app.post('/api/organization/setup', authenticateToken, upload.fields([
       });
     }
 
-    
     const signatureUrl = req.files?.signature?.[0]?.path || null;
     const companySealingUrl = req.files?.companySealing?.[0]?.path || null;
     const logoUrl = req.files?.logo?.[0]?.path || null;
@@ -698,7 +679,6 @@ app.post('/api/organization/setup', authenticateToken, upload.fields([
     const newOrganization = new Organization({
       userId: req.user.userId,
       organizationName,
-    //   organizationType,
       businessType,
       state,
       location,
@@ -721,7 +701,6 @@ app.post('/api/organization/setup', authenticateToken, upload.fields([
       organization: {
         id: populatedOrg._id,
         organizationName: populatedOrg.organizationName,
-        // organizationType: populatedOrg.organizationType,
         businessType: populatedOrg.businessType?.name,
         state: populatedOrg.state,
         location: populatedOrg.location,
@@ -741,79 +720,6 @@ app.post('/api/organization/setup', authenticateToken, upload.fields([
     });
   }
 });
-
-// app.post('/api/organization/setup', authenticateToken, async (req, res) => {
-//   try {
-//     const {
-//       organizationName,
-//       organizationType,
-//       businessType,
-//       state,
-//       location,
-//       currency,
-//       language,
-//       signature,
-//       companySealing,
-//       logo
-//     } = req.body;
-
-//     if (!organizationName) {
-//       return res.status(400).json({ 
-//         success: false,
-//         message: 'Organization name is required' 
-//       });
-//     }
-
-//     const existingOrg = await Organization.findOne({ userId: req.user.userId });
-//     if (existingOrg) {
-//       return res.status(400).json({ 
-//         success: false,
-//         message: 'Organization already setup for this user' 
-//       });
-//     }
-
-//     const newOrganization = new Organization({
-//       userId: req.user.userId,
-//       organizationName,
-//       organizationType,
-//       businessType,
-//       state,
-//       location,
-//       currency: currency || 'USD',
-//       language: language || 'English',
-//       signature,
-//       companySealing,
-//       logo,
-//       isSetupComplete: true
-//     });
-
-//     await newOrganization.save();
-
-//     console.log(`✅ Organization created for user: ${req.user.email}`);
-
-//     res.status(201).json({
-//       success: true,
-//       message: 'Organization setup completed successfully',
-//       organization: {
-//         id: newOrganization._id,
-//         organizationName: newOrganization.organizationName,
-//         organizationType: newOrganization.organizationType,
-//         businessType: newOrganization.businessType,
-//         state: newOrganization.state,
-//         location: newOrganization.location,
-//         currency: newOrganization.currency,
-//         language: newOrganization.language
-//       }
-//     });
-
-//   } catch (error) {
-//     console.error('❌ Organization setup error:', error);
-//     res.status(500).json({ 
-//       success: false,
-//       message: 'Server error. Please try again later.' 
-//     });
-//   }
-// });
 
 app.put('/api/organization/setup', authenticateToken, async (req, res) => {
   try {
@@ -877,36 +783,6 @@ app.get('/api/organization/details', authenticateToken, async (req, res) => {
     });
   }
 });
-
-// ==================== FILE UPLOAD ====================
-
-// const storage = multer.diskStorage({
-//   destination: (req, file, cb) => {
-//     cb(null, 'uploads/');
-//   },
-//   filename: (req, file, cb) => {
-//     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-//     cb(null, uniqueSuffix + path.extname(file.originalname));
-//   }
-// });
-
-// const upload = multer({
-//   storage: storage,
-//   limits: { 
-//     fileSize: 5 * 1024 * 1024 
-//   },
-//   fileFilter: (req, file, cb) => {
-//     const allowedTypes = /jpeg|jpg|png|gif/;
-//     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-//     const mimetype = allowedTypes.test(file.mimetype);
-
-//     if (mimetype && extname) {
-//       return cb(null, true);
-//     } else {
-//       cb(new Error('Only image files (JPEG, JPG, PNG, GIF) are allowed'));
-//     }
-//   }
-// });
 
 app.post('/api/organization/upload-image', authenticateToken, upload.single('image'), (req, res) => {
   try {
@@ -1031,14 +907,12 @@ app.use((err, req, res, next) => {
 
 // ==================== START SERVER ====================
 
-// const PORT = process.env.PORT || 5000;
-
 app.listen(PORT, () => {
   console.log(`
   ╔════════════════════════════════════════════╗
   ║   🚀 Invoice App Server Running           ║
   ║   📡 Port: ${PORT}                        ║
-  ║  
+  ║   📧 Email: SendGrid                      ║
   ╚════════════════════════════════════════════╝
   `);
 });
@@ -1052,8 +926,3 @@ process.on('uncaughtException', (err) => {
   console.error('❌ Uncaught Exception:', err);
   process.exit(1);
 });
-
-
-// app.listen(PORT, () => {
-//   console.log(`Server running on port ${PORT}`);
-// });
