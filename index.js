@@ -222,10 +222,10 @@ async function sendOTPEmail(email, otp, purpose) {
 }
 
 function generateOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  // return Math.floor(100000 + Math.random() * 900000).toString();
+  return Math.floor(1000 + Math.random() * 9000).toString()
 }
 
-// ==================== MIDDLEWARE ====================
 
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
