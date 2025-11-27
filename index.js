@@ -8,29 +8,23 @@ const jwt = require('jsonwebtoken');
 const sgMail = require('@sendgrid/mail');
 const multer = require('multer');
 const path = require('path');
+const connectDB = require('./config/db'); 
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 6000;
+connectDB()
 const categoryroutes = require('./routes/Category');
 const Category = require("./schema/Category");
 
 app.use(express.json());
 app.use(cors());
-
 app.use('/api/organization/businesstype/category', categoryroutes);
-
-// MongoDB Connection
-let db = "mongodb+srv://manishpdotpitchtechnologies_db_user:2PkhDVk8dfnmjMud@cluster0.ihrxtdj.mongodb.net/invoicedata?retryWrites=true&w=majority";
-mongoose.connect(process.env.MONGODB_URI || db)
-  .then(() => console.log('✅ MongoDB connected successfully'))
-  .catch(err => console.error('❌ MongoDB connection error:', err));
 
 app.get('/', (req, res) => {
   res.send('Hello World!');
 });
 
-// ==================== SCHEMAS ====================
 
 const otpSchema = new mongoose.Schema({
   email: { 
@@ -249,13 +243,11 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
-
-// ==================== AUTH ROUTES - SIGNUP ====================
-
 app.post('/api/auth/signup/send-otp', async (req, res) => {
   try {
     const { email } = req.body;
 
+    // 1️⃣ Validate email presence
     if (!email) {
       return res.status(400).json({ 
         success: false,
@@ -263,6 +255,7 @@ app.post('/api/auth/signup/send-otp', async (req, res) => {
       });
     }
 
+    // 2️⃣ Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ 
@@ -271,6 +264,7 @@ app.post('/api/auth/signup/send-otp', async (req, res) => {
       });
     }
 
+    // 3️⃣ Check if user already exists
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(400).json({ 
@@ -279,8 +273,13 @@ app.post('/api/auth/signup/send-otp', async (req, res) => {
       });
     }
 
-    const otp = generateOTP();
+    // 4️⃣ Generate OTP
+    const otp = generateOTP(); // You should have a generateOTP() function returning e.g., 6-digit code
+
+    // 5️⃣ Remove old OTP if exists
     await OTP.deleteOne({ email: email.toLowerCase() });
+
+    // 6️⃣ Save new OTP
     const otpDoc = new OTP({ 
       email: email.toLowerCase(), 
       otp, 
@@ -288,6 +287,7 @@ app.post('/api/auth/signup/send-otp', async (req, res) => {
     });
     await otpDoc.save();
 
+    // 7️⃣ Send OTP email
     const emailSent = await sendOTPEmail(email, otp, 'signup');
 
     if (!emailSent) {
@@ -297,10 +297,12 @@ app.post('/api/auth/signup/send-otp', async (req, res) => {
       });
     }
 
+    // 8️⃣ Return success + OTP in response (for testing only!)
     res.status(200).json({ 
       success: true,
       message: 'OTP sent successfully to your email',
-      email: email.toLowerCase()
+      email: email.toLowerCase(),
+      otp // ⚠️ Include this only for development/testing, not in production
     });
 
   } catch (error) {
@@ -311,6 +313,66 @@ app.post('/api/auth/signup/send-otp', async (req, res) => {
     });
   }
 });
+
+// app.post('/api/auth/signup/send-otp', async (req, res) => {
+//   try {
+//     const { email } = req.body;
+
+//     if (!email) {
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'Email is required' 
+//       });
+//     }
+
+//     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+//     if (!emailRegex.test(email)) {
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'Invalid email format' 
+//       });
+//     }
+
+//     const existingUser = await User.findOne({ email: email.toLowerCase() });
+//     if (existingUser) {
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'Email already registered. Please login instead.' 
+//       });
+//     }
+
+//     const otp = generateOTP();
+//     await OTP.deleteOne({ email: email.toLowerCase() });
+//     const otpDoc = new OTP({ 
+//       email: email.toLowerCase(), 
+//       otp, 
+//       purpose: 'signup' 
+//     });
+//     await otpDoc.save();
+
+//     const emailSent = await sendOTPEmail(email, otp, 'signup');
+
+//     if (!emailSent) {
+//       return res.status(500).json({ 
+//         success: false,
+//         message: 'Failed to send OTP email. Please try again.' 
+//       });
+//     }
+
+//     res.status(200).json({ 
+//       success: true,
+//       message: 'OTP sent successfully to your email',
+//       email: email.toLowerCase()
+//     });
+
+//   } catch (error) {
+//     console.error('❌ Send OTP error:', error);
+//     res.status(500).json({ 
+//       success: false,
+//       message: 'Server error. Please try again later.' 
+//     });
+//   }
+// });
 
 app.post('/api/auth/signup/verify-otp', async (req, res) => {
   try {
@@ -444,19 +506,19 @@ app.post('/api/auth/signup/resend-otp', async (req, res) => {
   }
 });
 
-// ==================== AUTH ROUTES - LOGIN ====================
-
 app.post('/api/auth/login/send-otp', async (req, res) => {
   try {
     const { email } = req.body;
 
+    // 1️⃣ Validate email
     if (!email) {
-      return res.status(400).json({ 
+      return res.status(400).json({  
         success: false,
         message: 'Email is required' 
       });
     }
 
+    // 2️⃣ Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ 
@@ -465,6 +527,7 @@ app.post('/api/auth/login/send-otp', async (req, res) => {
       });
     }
 
+    // 3️⃣ Check if user exists
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (!existingUser) {
       return res.status(404).json({ 
@@ -473,8 +536,13 @@ app.post('/api/auth/login/send-otp', async (req, res) => {
       });
     }
 
-    const otp = generateOTP();
+    // 4️⃣ Generate OTP
+    const otp = generateOTP(); // 6-digit numeric string
+
+    // 5️⃣ Remove old OTP
     await OTP.deleteOne({ email: email.toLowerCase() });
+
+    // 6️⃣ Save new OTP
     const otpDoc = new OTP({ 
       email: email.toLowerCase(), 
       otp, 
@@ -482,6 +550,7 @@ app.post('/api/auth/login/send-otp', async (req, res) => {
     });
     await otpDoc.save();
 
+    // 7️⃣ Send OTP email
     const emailSent = await sendOTPEmail(email, otp, 'login');
 
     if (!emailSent) {
@@ -491,10 +560,12 @@ app.post('/api/auth/login/send-otp', async (req, res) => {
       });
     }
 
+    // 8️⃣ Return success + OTP in response (for testing)
     res.status(200).json({ 
       success: true,
       message: 'OTP sent successfully to your email',
-      email: email.toLowerCase()
+      email: email.toLowerCase(),
+      otp // ⚠️ Only for testing/dev; remove in production
     });
 
   } catch (error) {
@@ -505,6 +576,66 @@ app.post('/api/auth/login/send-otp', async (req, res) => {
     });
   }
 });
+
+// app.post('/api/auth/login/send-otp', async (req, res) => {
+//   try {
+//     const { email } = req.body;
+
+//     if (!email) {
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'Email is required' 
+//       });
+//     }
+
+//     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+//     if (!emailRegex.test(email)) {
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'Invalid email format' 
+//       });
+//     }
+
+//     const existingUser = await User.findOne({ email: email.toLowerCase() });
+//     if (!existingUser) {
+//       return res.status(404).json({ 
+//         success: false,
+//         message: 'Email not registered. Please signup first.' 
+//       });
+//     }
+
+//     const otp = generateOTP();
+//     await OTP.deleteOne({ email: email.toLowerCase() });
+//     const otpDoc = new OTP({ 
+//       email: email.toLowerCase(), 
+//       otp, 
+//       purpose: 'login' 
+//     });
+//     await otpDoc.save();
+
+//     const emailSent = await sendOTPEmail(email, otp, 'login');
+
+//     if (!emailSent) {
+//       return res.status(500).json({ 
+//         success: false,
+//         message: 'Failed to send OTP email. Please try again.' 
+//       });
+//     }
+
+//     res.status(200).json({ 
+//       success: true,
+//       message: 'OTP sent successfully to your email',
+//       email: email.toLowerCase()
+//     });
+
+//   } catch (error) {
+//     console.error('❌ Send OTP error:', error);
+//     res.status(500).json({ 
+//       success: false,
+//       message: 'Server error. Please try again later.' 
+//     });
+//   }
+// });
 
 app.post('/api/auth/login/verify-otp', async (req, res) => {
   try {
