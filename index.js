@@ -369,7 +369,7 @@ app.use('/api/organization/businesstype/category',authenticateToken, categoryrou
 //     });
 //   }
 // });
-app.use('/api/text',authenticateToken, taxroutes);
+app.use('/api/tax',authenticateToken, taxroutes);
 app.use('/uploads', express.static('uploads'));
 app.use('/api', authenticateToken,Clientroutes)
 app.use((req, res) => {
