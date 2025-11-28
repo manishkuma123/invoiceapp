@@ -20,7 +20,7 @@ app.use(express.json());
 app.use(cors());
 
 app.use('/api/auth', authRoutes);
-app.use('/api/text', taxroutes);
+
 app.get('/', (req, res) => {
   res.send('Hello World!');
 });
@@ -154,6 +154,7 @@ const authenticateToken = (req, res, next) => {
 
 
 app.post('/api/organization',organizationrouter)
+
 app.post('/api/organization/setup', authenticateToken, upload.fields([
   { name: "signature", maxCount: 1 },
   { name: "companySealing", maxCount: 1 },
@@ -334,6 +335,7 @@ app.use('/api/organization/businesstype/category',authenticateToken, categoryrou
 //     });
 //   }
 // });
+app.use('/api/text',authenticateToken, taxroutes);
 app.use('/uploads', express.static('uploads'));
 app.use('/api', authenticateToken,Clientroutes)
 app.use((req, res) => {
