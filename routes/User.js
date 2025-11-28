@@ -128,7 +128,7 @@ router.post('/signup/send-otp', async (req, res) => {
       success: true,
       message: 'OTP sent successfully to your email',
       email: email.toLowerCase(),
-      otp // ⚠️ Remove in production
+      otp 
     });
 
   } catch (error) {

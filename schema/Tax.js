@@ -1,25 +1,20 @@
 const mongoose = require("mongoose");
 
-const otpSchema = new mongoose.Schema({
+const taxSchema = new mongoose.Schema({
   title: { 
     type: String, 
     required: true, 
-    unique: true,
-    lowercase: true, 
-    trim: true
+    trim: true 
   },
-   percentage: {
-        type: Number,
-        required: true,
-        unique: true,
-        trim: true
-    },
+  percentage: { 
+    type: Number, 
+    required: true 
+  },
   createdAt: { 
     type: Date, 
-    default: Date.now, 
-    expires: 600 
+    default: Date.now 
   }
 });
 
-const TAX = mongoose.model('TAX', otpSchema);
-module.exports =  TAX ;
+const TAX = mongoose.model('TAX', taxSchema);
+module.exports = TAX;

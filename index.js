@@ -6,6 +6,8 @@ const sgMail = require('@sendgrid/mail');
 const connectDB = require('./config/db'); 
 const Organization  = require('./schema/organization')
 const authRoutes = require('./routes/User');
+
+const organizationrouter = require('./routes/Organization')
 require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 6000;
@@ -18,7 +20,7 @@ app.use(express.json());
 app.use(cors());
 
 app.use('/api/auth', authRoutes);
-// app.use('/api/text', taxroutes);
+app.use('/api/text', taxroutes);
 app.get('/', (req, res) => {
   res.send('Hello World!');
 });
@@ -151,7 +153,7 @@ const authenticateToken = (req, res, next) => {
 // });
 
 
-
+app.post('/api/organization',organizationrouter)
 app.post('/api/organization/setup', authenticateToken, upload.fields([
   { name: "signature", maxCount: 1 },
   { name: "companySealing", maxCount: 1 },

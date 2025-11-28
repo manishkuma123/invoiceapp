@@ -939,7 +939,6 @@ app.post('/api/organization/upload-image', authenticateToken, upload.single('ima
 
 app.use('/uploads', express.static('uploads'));
 
-// ==================== USER ROUTES ====================
 
 app.get('/api/user/profile', authenticateToken, async (req, res) => {
   try {
@@ -1002,7 +1001,6 @@ app.put('/api/user/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// ==================== HEALTH CHECK ====================
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({
@@ -1012,7 +1010,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ==================== ERROR HANDLING ====================
 
 app.use((req, res) => {
   res.status(404).json({
