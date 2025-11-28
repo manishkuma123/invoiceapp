@@ -54,15 +54,49 @@ const authenticateToken = (req, res, next) => {
 
   jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-this', (err, user) => {
     if (err) {
-      return res.status(403).json({ 
-        success: false,
-        message: 'Invalid or expired token' 
-      });
+      if (err.name === 'TokenExpiredError') {
+        // Token has expired
+        return res.status(403).json({ 
+          success: false,
+          message: 'Token expired'
+        });
+      } else {
+        // Other errors (invalid signature, malformed token, etc.)
+        return res.status(403).json({ 
+          success: false,
+          message: 'Invalid token'
+        });
+      }
     }
+    
+ 
     req.user = user;
     next();
   });
-}; 
+};
+
+// const authenticateToken = (req, res, next) => {
+//   const authHeader = req.headers['authorization'];
+//   const token = authHeader && authHeader.split(' ')[1];
+
+//   if (!token) {
+//     return res.status(401).json({ 
+//       success: false,
+//       message: 'Access token required' 
+//     });
+//   }
+
+//   jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-this', (err, user) => {
+//     if (err) {
+//       return res.status(403).json({ 
+//         success: false,
+//         message: 'Invalid or expired token' 
+//       });
+//     }
+//     req.user = user;
+//     next();
+//   });
+// }; 
 // when user signup /login then hasCompletedOrgSetup true /false base on hasCompletedOrgSetup have to redirect home or organization redirect from froentend only not in backend 
 // app.post('/api/organization/setup', authenticateToken, upload.fields([
 //   { name: "signature", maxCount: 1 },
