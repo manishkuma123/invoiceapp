@@ -544,8 +544,7 @@ const Invoice = require('../schema/Invoice');
 const Client = require('../schema/Client');
 const TAX = require('../schema/Tax');
 
-const upload = require("../config/upload");     // <-- multer-cloudinary
-
+const upload = require("../config/upload");    
 
 router.post(
   "/invoice/add",
@@ -679,10 +678,6 @@ router.post(
     }
   }
 );
-
-
-
-
 router.get("/invoice/all", async (req, res) => { 
   try {
     const invoices = await Invoice.find()
@@ -705,8 +700,6 @@ router.get("/invoice/all", async (req, res) => {
     });
   }
 });
-
-
 router.put(
   "/invoice/update/:id",
   upload.fields([
@@ -782,7 +775,6 @@ router.put(
     }
   }
 );
-
 router.delete("/invoice/delete/:id", async (req, res) => {
   try {
     const invoiceId = req.params.id;
@@ -810,24 +802,11 @@ router.delete("/invoice/delete/:id", async (req, res) => {
   }
 });
 
-
-
-router.patch('/invoice/status/:id', async (req, res) => {
+router.get('/invoice/status/:id', async (req, res) => {
   try {
-    const { status } = req.body;
-    
-    if (!['pending', 'paid', 'overdue', 'cancelled', 'draft'].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid status. Must be: pending, paid, overdue, cancelled, or draft'
-      });
-    }
-    
-    const invoice = await Invoice.findByIdAndUpdate(
-      req.params.id,
-      { status, paidDate: status === 'paid' ? new Date() : null },
-      { new: true }
-    ).populate('clientId', 'firstName lastName businessName email');
+    const invoice = await Invoice.findById(req.params.id)
+      .select('invoiceNumber status paidDate dueDate')
+      .populate('clientId', 'firstName lastName businessName');
     
     if (!invoice) {
       return res.status(404).json({
@@ -838,7 +817,58 @@ router.patch('/invoice/status/:id', async (req, res) => {
     
     res.json({
       success: true,
-      message: 'Invoice status updated successfully',
+      data: {
+        invoiceNumber: invoice.invoiceNumber,
+        status: invoice.status,
+        paidDate: invoice.paidDate,
+        dueDate: invoice.dueDate,
+        client: invoice.clientId
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching invoice status',
+      error: error.message
+    });
+  }
+});
+
+
+router.patch('/invoice/status/:id', async (req, res) => {
+  try {
+    const { status } = req.body;
+    
+
+    if (!['pending', 'paid', 'overdue', 'cancelled', 'draft'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status. Must be: pending, paid, overdue, cancelled, or draft'
+      });
+    }
+    
+
+    const invoice = await Invoice.findByIdAndUpdate(
+      req.params.id,
+      { 
+        status, 
+        paidDate: status === 'paid' ? new Date() : null 
+      },
+      { new: true }
+    )
+      .populate('clientId', 'firstName lastName businessName email')
+      .populate('tax', 'title percentage');
+    
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invoice not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: `Invoice status updated to ${status} successfully`,
       data: invoice
     });
   } catch (error) {
@@ -849,8 +879,43 @@ router.patch('/invoice/status/:id', async (req, res) => {
     });
   }
 });
-
-
+// router.patch('/invoice/status/:id', async (req, res) => {
+//   try {
+//     const { status } = req.body;
+    
+//     if (!['pending', 'paid', 'overdue', 'cancelled', 'draft'].includes(status)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Invalid status. Must be: pending, paid, overdue, cancelled, or draft'
+//       });
+//     }
+    
+//     const invoice = await Invoice.findByIdAndUpdate(
+//       req.params.id,
+//       { status, paidDate: status === 'paid' ? new Date() : null },
+//       { new: true }
+//     ).populate('clientId', 'firstName lastName businessName email');
+    
+//     if (!invoice) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'Invoice not found'
+//       });
+//     }
+    
+//     res.json({
+//       success: true,
+//       message: 'Invoice status updated successfully',
+//       data: invoice
+//     });
+//   } catch (error) {
+//     res.status(400).json({
+//       success: false,
+//       message: 'Error updating invoice status',
+//       error: error.message
+//     });
+//   }
+// });
 router.delete('/invoice/delete/:id', async (req, res) => {
   try {
     const invoice = await Invoice.findByIdAndDelete(req.params.id);
@@ -875,8 +940,6 @@ router.delete('/invoice/delete/:id', async (req, res) => {
     });
   }
 });
-
-// ==================== DASHBOARD STATS ====================
 router.get('/dashboard/stats', async (req, res) => {
   try {
     const totalInvoices = await Invoice.countDocuments();
@@ -922,8 +985,6 @@ router.get('/dashboard/stats', async (req, res) => {
     });
   }
 });
-
-
 router.get('/dashboard/revenue-chart', async (req, res) => {
   try {
     const { year = new Date().getFullYear() } = req.query;
@@ -970,8 +1031,6 @@ router.get('/dashboard/revenue-chart', async (req, res) => {
     });
   }
 });
-
-
 router.get('/dashboard/recent-invoices', async (req, res) => {
   try {
     const { limit = 5 } = req.query;
@@ -994,9 +1053,6 @@ router.get('/dashboard/recent-invoices', async (req, res) => {
     });
   }
 });
-
-
-
 router.post('/tax/add', async (req, res) => {
   try {
     const { title, percentage } = req.body;
@@ -1029,7 +1085,6 @@ router.post('/tax/add', async (req, res) => {
   }
 });
 
-// Get All Taxes
 router.get('/tax/access', async (req, res) => {
   try {
     const taxes = await TAX.find().sort({ createdAt: -1 });
@@ -1047,7 +1102,6 @@ router.get('/tax/access', async (req, res) => {
   }
 });
 
-// Get Single Tax
 router.get('/tax/:id', async (req, res) => {
   try {
     const tax = await TAX.findById(req.params.id);
@@ -1072,7 +1126,6 @@ router.get('/tax/:id', async (req, res) => {
   }
 });
 
-// Update Tax
 router.put('/tax/update/:id', async (req, res) => {
   try {
     const { title, percentage } = req.body;
@@ -1104,7 +1157,7 @@ router.put('/tax/update/:id', async (req, res) => {
   }
 });
 
-// Delete Tax
+
 router.delete('/tax/delete/:id', async (req, res) => {
   try {
     const tax = await TAX.findByIdAndDelete(req.params.id);
@@ -1128,6 +1181,6 @@ router.delete('/tax/delete/:id', async (req, res) => {
       error: error.message
     });
   }
-});
+Tax});
 
 module.exports = router;

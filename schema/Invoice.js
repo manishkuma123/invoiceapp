@@ -141,7 +141,11 @@ const InvoiceSchema = new mongoose.Schema(
     totalamount: { type: Number, default: 0 },
 
     currency: { type: String, default: 'INR' },
-
+    status: {
+      type: String,
+      enum: ['pending', 'paid', 'overdue', 'cancelled', 'draft'],
+      default: 'pending'
+    },
     notes: { type: String, default: '' },
    
     signature: { type: String, default: '' },
