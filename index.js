@@ -185,8 +185,7 @@ const authenticateToken = (req, res, next) => {
 //     });
 //   }
 // });
-
-
+app.use('/api/tax',authenticateToken, taxroutes);
 app.use('/api/organization',organizationrouter)
 app.use('/api' ,  authenticateToken,invoicedata)
 app.post('/api/organization/setup', authenticateToken, upload.fields([
@@ -369,7 +368,7 @@ app.use('/api/organization/businesstype/category',authenticateToken, categoryrou
 //     });
 //   }
 // });
-app.use('/api/tax',authenticateToken, taxroutes);
+
 app.use('/uploads', express.static('uploads'));
 app.use('/api', authenticateToken,Clientroutes)
 app.use((req, res) => {

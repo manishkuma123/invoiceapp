@@ -1,25 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const TAX = require('../schema/Tax'); 
+const TAX = require('../schema/Tax');
 
-// CREATE: Add new tax
-// router.post('/add', async (req, res) => {
-//   try {
-//     const existingTax = await TAX.findOne({ title: req.body.title });
-//     if (existingTax) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'A tax with this title already exists'
-//       });
-//     }
-
-//     const tax = new TAX(req.body);
-//     const savedTax = await tax.save();
-//     res.status(201).json({ success: true, data: savedTax });
-//   } catch (err) {
-//     res.status(400).json({ success: false, error: err.message });
-//   }
-// });
 
 router.post('/add', async (req, res) => {
   try {
@@ -31,18 +13,16 @@ router.post('/add', async (req, res) => {
   }
 });
 
-
-
-router.get('/all', async (req, res) => {
+router.get('/all', async (req, res) => { 
   try {
     const taxes = await TAX.find();
-    res.status(200).json(taxes);
+    res.status(200).json({ success: true, data: taxes });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
-
+// GET SINGLE TAX
 router.get('/:id', async (req, res) => {
   try {
     const tax = await TAX.findById(req.params.id);
@@ -53,7 +33,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-
+// UPDATE
 router.put('/update/:id', async (req, res) => {
   try {
     const updatedTax = await TAX.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -64,7 +44,7 @@ router.put('/update/:id', async (req, res) => {
   }
 });
 
-
+// DELETE
 router.delete('/delete/:id', async (req, res) => {
   try {
     const deletedTax = await TAX.findByIdAndDelete(req.params.id);
