@@ -6,7 +6,7 @@ const sgMail = require('@sendgrid/mail');
 const connectDB = require('./config/db'); 
 const Organization  = require('./schema/organization')
 const authRoutes = require('./routes/User');
-
+const invoicedata = require("./routes/invoiceroutes")
 const organizationrouter = require('./routes/Organization')
 require('dotenv').config();
 const app = express();
@@ -187,8 +187,8 @@ const authenticateToken = (req, res, next) => {
 // });
 
 
-app.post('/api/organization',organizationrouter)
-
+app.use('/api/organization',organizationrouter)
+app.use('/api' ,  authenticateToken,invoicedata)
 app.post('/api/organization/setup', authenticateToken, upload.fields([
   { name: "signature", maxCount: 1 },
   { name: "companySealing", maxCount: 1 },

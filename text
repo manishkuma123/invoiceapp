@@ -321,3 +321,941 @@
 // app.listen(PORT, () => {
 //   console.log(`Server running on port ${PORT}`);
 // });
+
+
+
+
+
+// ============================================================================
+// COMPLETE INVOICE MANAGEMENT API WITH MONGODB
+// ============================================================================
+
+const express = require('express');
+const router = express.Router();
+const Invoice = require('../schema/Invoice');
+const Client = require('../schema/Client');
+const TAX = require('../schema/Tax');
+
+
+router.post('/invoice/add', async (req, res) => {
+  try {
+    const { 
+      invoiceType,
+      clientId, 
+      items, 
+      taxId, 
+      discount, 
+      notes, 
+      invoiceDate, 
+      dueDate, 
+      currency,
+      subject,
+      signature,
+      companyStamp,
+      paymentTerms
+    } = req.body;
+    
+  
+    const client = await Client.findById(clientId);
+    if (!client) {
+      return res.status(404).json({
+        success: false,
+        message: 'Client not found'
+      });
+    }
+  
+    let taxRate = 0;
+    let taxDetails = null;
+    if (taxId) {
+      const tax = await TAX.findById(taxId);
+      if (!tax) {
+        return res.status(404).json({
+          success: false,
+          message: 'Tax not found'
+        });
+      }
+      taxRate = tax.percentage;
+      taxDetails = {
+        taxId: tax._id,
+        title: tax.title,
+        percentage: tax.percentage
+      };
+    }
+    
+
+    let subtotal = 0;
+    const processedItems = items.map(item => {
+      const amount = item.quantity * item.rate;
+      subtotal += amount;
+      return {
+        description: item.description,
+        quantity: item.quantity,
+        rate: item.rate,
+        amount: parseFloat(amount.toFixed(2))
+      };
+    });
+    
+    const discountAmount = discount ? (subtotal * discount / 100) : 0;
+    const subtotalAfterDiscount = subtotal - discountAmount;
+    const taxAmount = (subtotalAfterDiscount * taxRate) / 100;
+    const total = subtotalAfterDiscount + taxAmount;
+    
+  
+    const lastInvoice = await Invoice.findOne().sort({ invoiceNumber: -1 });
+    let invoiceNumber = 'INV-100001';
+    if (lastInvoice && lastInvoice.invoiceNumber) {
+      const lastNum = parseInt(lastInvoice.invoiceNumber.split('-')[1]);
+      invoiceNumber = `INV-${String(lastNum + 1).padStart(6, '0')}`;
+    }
+    
+    const invoice = new Invoice({
+      invoiceType: invoiceType || 'Standard Invoice',
+      invoiceNumber,
+      clientId,
+      invoiceDate: invoiceDate || new Date(),
+      dueDate: dueDate || new Date(Date.now() + 30*24*60*60*1000),
+      subject: subject || '',
+      items: processedItems,
+      subtotal: parseFloat(subtotal.toFixed(2)),
+      discount: discount || 0,
+      discountAmount: parseFloat(discountAmount.toFixed(2)),
+      tax: taxDetails,
+      taxAmount: parseFloat(taxAmount.toFixed(2)),
+      total: parseFloat(total.toFixed(2)),
+      currency: currency || 'INR',
+      notes: notes || '',
+      paymentTerms: paymentTerms || '',
+      signature: signature || '',
+      companyStamp: companyStamp || '',
+      status: 'pending'
+    });
+    
+    await invoice.save();
+    
+    const populatedInvoice = await Invoice.findById(invoice._id)
+      .populate('clientId', 'firstName lastName businessName email')
+      .populate('tax.taxId', 'title percentage');
+    
+    res.status(201).json({
+      success: true,
+      message: 'Invoice created successfully',
+      data: populatedInvoice
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: 'Error creating invoice',
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// READ OPERATIONS
+// ============================================================================
+
+// READ: Get all invoices with filters and pagination
+router.get('/invoice/access', async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 10, 
+      search, 
+      status, 
+      clientId,
+      startDate,
+      endDate,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+    
+    const query = {};
+    
+    // Search filter
+    if (search) {
+      query.$or = [
+        { invoiceNumber: { $regex: search, $options: 'i' } },
+        { notes: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    // Status filter
+    if (status) {
+      query.status = status;
+    }
+    
+    // Client filter
+    if (clientId) {
+      query.clientId = clientId;
+    }
+    
+    // Date range filter
+    if (startDate || endDate) {
+      query.invoiceDate = {};
+      if (startDate) query.invoiceDate.$gte = new Date(startDate);
+      if (endDate) query.invoiceDate.$lte = new Date(endDate);
+    }
+    
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    
+    const invoices = await Invoice.find(query)
+      .populate('clientId', 'firstName lastName businessName email mobile')
+      .populate('tax.taxId', 'title percentage')
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort(sortOptions);
+    
+    const count = await Invoice.countDocuments(query);
+    
+    // Calculate summary statistics
+    const totalRevenue = await Invoice.aggregate([
+      { $match: { ...query, status: 'paid' } },
+      { $group: { _id: null, total: { $sum: '$total' } } }
+    ]);
+    
+    const pendingAmount = await Invoice.aggregate([
+      { $match: { ...query, status: 'pending' } },
+      { $group: { _id: null, total: { $sum: '$total' } } }
+    ]);
+    
+    res.json({
+      success: true,
+      data: invoices,
+      pagination: {
+        totalPages: Math.ceil(count / limit),
+        currentPage: parseInt(page),
+        totalInvoices: count,
+        limit: parseInt(limit)
+      },
+      summary: {
+        totalRevenue: totalRevenue[0]?.total || 0,
+        pendingAmount: pendingAmount[0]?.total || 0
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching invoices',
+      error: error.message
+    });
+  }
+});
+
+// READ: Get single invoice by ID
+router.get('/invoice/:id', async (req, res) => {
+  try {
+    const invoice = await Invoice.findById(req.params.id)
+      .populate('clientId')
+      .populate('tax.taxId', 'title percentage');
+    
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invoice not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: invoice
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching invoice',
+      error: error.message
+    });
+  }
+});
+
+// READ: Get invoice by invoice number
+router.get('/invoice/number/:invoiceNumber', async (req, res) => {
+  try {
+    const invoice = await Invoice.findOne({ invoiceNumber: req.params.invoiceNumber })
+      .populate('clientId')
+      .populate('tax.taxId', 'title percentage');
+    
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invoice not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: invoice
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching invoice',
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// UPDATE OPERATIONS
+// ============================================================================
+
+// UPDATE: Full invoice update (PUT)
+router.put('/invoice/update/:id', async (req, res) => {
+  try {
+    const invoiceId = req.params.id;
+    const { 
+      invoiceType,
+      clientId,
+      items, 
+      taxId, 
+      discount,
+      notes,
+      invoiceDate,
+      dueDate,
+      currency,
+      subject,
+      signature,
+      companyStamp,
+      paymentTerms,
+      status
+    } = req.body;
+    
+    // Find existing invoice
+    const invoice = await Invoice.findById(invoiceId);
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invoice not found'
+      });
+    }
+    
+    // Validate client if being updated
+    if (clientId && clientId !== invoice.clientId.toString()) {
+      const client = await Client.findById(clientId);
+      if (!client) {
+        return res.status(404).json({
+          success: false,
+          message: 'Client not found'
+        });
+      }
+      invoice.clientId = clientId;
+    }
+    
+    // Handle items, tax, and discount updates (recalculate totals)
+    const shouldRecalculate = items !== undefined || 
+                               taxId !== undefined || 
+                               discount !== undefined;
+    
+    if (shouldRecalculate) {
+      // Use provided items or keep existing
+      const invoiceItems = items || invoice.items;
+      
+      // Calculate subtotal
+      let subtotal = 0;
+      const processedItems = invoiceItems.map(item => {
+        const amount = item.quantity * item.rate;
+        subtotal += amount;
+        return {
+          description: item.description,
+          quantity: item.quantity,
+          rate: item.rate,
+          amount: parseFloat(amount.toFixed(2))
+        };
+      });
+      
+      // Handle tax
+      let taxRate = 0;
+      let taxDetails = null;
+      
+      if (taxId !== undefined) {
+        if (taxId === null || taxId === '') {
+          // Remove tax
+          taxDetails = null;
+          taxRate = 0;
+        } else {
+          // Update tax
+          const tax = await TAX.findById(taxId);
+          if (!tax) {
+            return res.status(404).json({
+              success: false,
+              message: 'Tax not found'
+            });
+          }
+          taxRate = tax.percentage;
+          taxDetails = {
+            taxId: tax._id,
+            title: tax.title,
+            percentage: tax.percentage
+          };
+        }
+      } else if (invoice.tax) {
+        // Keep existing tax
+        taxRate = invoice.tax.percentage;
+        taxDetails = invoice.tax;
+      }
+      
+      // Calculate discount and total
+      const discountPercent = discount !== undefined ? discount : invoice.discount;
+      const discountAmount = (subtotal * discountPercent) / 100;
+      const subtotalAfterDiscount = subtotal - discountAmount;
+      const taxAmount = (subtotalAfterDiscount * taxRate) / 100;
+      const total = subtotalAfterDiscount + taxAmount;
+      
+      // Update calculated fields
+      invoice.items = processedItems;
+      invoice.subtotal = parseFloat(subtotal.toFixed(2));
+      invoice.discount = discountPercent;
+      invoice.discountAmount = parseFloat(discountAmount.toFixed(2));
+      invoice.tax = taxDetails;
+      invoice.taxAmount = parseFloat(taxAmount.toFixed(2));
+      invoice.total = parseFloat(total.toFixed(2));
+    }
+    
+    // Update other fields if provided
+    if (invoiceType !== undefined) invoice.invoiceType = invoiceType;
+    if (invoiceDate !== undefined) invoice.invoiceDate = invoiceDate;
+    if (dueDate !== undefined) invoice.dueDate = dueDate;
+    if (subject !== undefined) invoice.subject = subject;
+    if (currency !== undefined) invoice.currency = currency;
+    if (notes !== undefined) invoice.notes = notes;
+    if (paymentTerms !== undefined) invoice.paymentTerms = paymentTerms;
+    if (signature !== undefined) invoice.signature = signature;
+    if (companyStamp !== undefined) invoice.companyStamp = companyStamp;
+    if (status !== undefined) {
+      if (!['pending', 'paid', 'overdue', 'cancelled', 'draft'].includes(status)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid status. Must be: pending, paid, overdue, cancelled, or draft'
+        });
+      }
+      invoice.status = status;
+      if (status === 'paid' && !invoice.paidDate) {
+        invoice.paidDate = new Date();
+      }
+    }
+    
+    // Save updated invoice
+    await invoice.save();
+    
+    // Populate and return
+    const updatedInvoice = await Invoice.findById(invoice._id)
+      .populate('clientId', 'firstName lastName businessName email mobile')
+      .populate('tax.taxId', 'title percentage');
+    
+    res.json({
+      success: true,
+      message: 'Invoice updated successfully',
+      data: updatedInvoice
+    });
+    
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: 'Error updating invoice',
+      error: error.message
+    });
+  }
+});
+
+// UPDATE: Partial invoice update (PATCH)
+router.patch('/invoice/update/:id', async (req, res) => {
+  try {
+    const invoiceId = req.params.id;
+    const updates = req.body;
+    
+    // Find existing invoice
+    const invoice = await Invoice.findById(invoiceId);
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invoice not found'
+      });
+    }
+    
+    // Validate client if being updated
+    if (updates.clientId) {
+      const client = await Client.findById(updates.clientId);
+      if (!client) {
+        return res.status(404).json({
+          success: false,
+          message: 'Client not found'
+        });
+      }
+    }
+    
+    // Check if recalculation is needed
+    const needsRecalculation = updates.items || 
+                                updates.taxId !== undefined || 
+                                updates.discount !== undefined;
+    
+    if (needsRecalculation) {
+      // Use provided items or keep existing
+      const invoiceItems = updates.items || invoice.items;
+      
+      // Calculate subtotal
+      let subtotal = 0;
+      const processedItems = invoiceItems.map(item => {
+        const amount = item.quantity * item.rate;
+        subtotal += amount;
+        return {
+          description: item.description,
+          quantity: item.quantity,
+          rate: item.rate,
+          amount: parseFloat(amount.toFixed(2))
+        };
+      });
+      
+      // Handle tax
+      let taxRate = 0;
+      let taxDetails = null;
+      
+      if (updates.taxId !== undefined) {
+        if (updates.taxId === null || updates.taxId === '') {
+          taxDetails = null;
+          taxRate = 0;
+        } else {
+          const tax = await TAX.findById(updates.taxId);
+          if (!tax) {
+            return res.status(404).json({
+              success: false,
+              message: 'Tax not found'
+            });
+          }
+          taxRate = tax.percentage;
+          taxDetails = {
+            taxId: tax._id,
+            title: tax.title,
+            percentage: tax.percentage
+          };
+        }
+      } else if (invoice.tax) {
+        taxRate = invoice.tax.percentage;
+        taxDetails = invoice.tax;
+      }
+      
+      // Calculate discount and total
+      const discountPercent = updates.discount !== undefined ? updates.discount : invoice.discount;
+      const discountAmount = (subtotal * discountPercent) / 100;
+      const subtotalAfterDiscount = subtotal - discountAmount;
+      const taxAmount = (subtotalAfterDiscount * taxRate) / 100;
+      const total = subtotalAfterDiscount + taxAmount;
+      
+      // Apply calculated updates
+      updates.items = processedItems;
+      updates.subtotal = parseFloat(subtotal.toFixed(2));
+      updates.discount = discountPercent;
+      updates.discountAmount = parseFloat(discountAmount.toFixed(2));
+      updates.tax = taxDetails;
+      updates.taxAmount = parseFloat(taxAmount.toFixed(2));
+      updates.total = parseFloat(total.toFixed(2));
+    }
+    
+    // Validate status if being updated
+    if (updates.status) {
+      if (!['pending', 'paid', 'overdue', 'cancelled', 'draft'].includes(updates.status)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid status. Must be: pending, paid, overdue, cancelled, or draft'
+        });
+      }
+      if (updates.status === 'paid' && !invoice.paidDate) {
+        updates.paidDate = new Date();
+      }
+    }
+    
+    // Apply all updates
+    Object.keys(updates).forEach(key => {
+      invoice[key] = updates[key];
+    });
+    
+    await invoice.save();
+    
+    // Populate and return
+    const updatedInvoice = await Invoice.findById(invoice._id)
+      .populate('clientId', 'firstName lastName businessName email mobile')
+      .populate('tax.taxId', 'title percentage');
+    
+    res.json({
+      success: true,
+      message: 'Invoice updated successfully',
+      data: updatedInvoice
+    });
+    
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: 'Error updating invoice',
+      error: error.message
+    });
+  }
+});
+
+// UPDATE: Quick update (non-calculated fields only)
+router.patch('/invoice/quick-update/:id', async (req, res) => {
+  try {
+    const { notes, subject, paymentTerms, signature, companyStamp } = req.body;
+    
+    const allowedUpdates = {};
+    if (notes !== undefined) allowedUpdates.notes = notes;
+    if (subject !== undefined) allowedUpdates.subject = subject;
+    if (paymentTerms !== undefined) allowedUpdates.paymentTerms = paymentTerms;
+    if (signature !== undefined) allowedUpdates.signature = signature;
+    if (companyStamp !== undefined) allowedUpdates.companyStamp = companyStamp;
+    
+    const invoice = await Invoice.findByIdAndUpdate(
+      req.params.id,
+      allowedUpdates,
+      { new: true, runValidators: true }
+    )
+      .populate('clientId', 'firstName lastName businessName email')
+      .populate('tax.taxId', 'title percentage');
+    
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invoice not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Invoice updated successfully',
+      data: invoice
+    });
+    
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: 'Error updating invoice',
+      error: error.message
+    });
+  }
+});
+
+// UPDATE: Update invoice status
+router.patch('/invoice/status/:id', async (req, res) => {
+  try {
+    const { status } = req.body;
+    
+    if (!['pending', 'paid', 'overdue', 'cancelled', 'draft'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status. Must be: pending, paid, overdue, cancelled, or draft'
+      });
+    }
+    
+    const invoice = await Invoice.findByIdAndUpdate(
+      req.params.id,
+      { status, paidDate: status === 'paid' ? new Date() : null },
+      { new: true }
+    ).populate('clientId', 'firstName lastName businessName email');
+    
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invoice not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Invoice status updated successfully',
+      data: invoice
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: 'Error updating invoice status',
+      error: error.message
+    });
+  }
+});
+
+// UPDATE: Add item to existing invoice
+router.post('/invoice/:id/add-item', async (req, res) => {
+  try {
+    const { description, quantity, rate } = req.body;
+    
+    if (!description || !quantity || !rate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Description, quantity, and rate are required'
+      });
+    }
+    
+    const invoice = await Invoice.findById(req.params.id);
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invoice not found'
+      });
+    }
+    
+    // Add new item
+    const amount = quantity * rate;
+    invoice.items.push({
+      description,
+      quantity,
+      rate,
+      amount: parseFloat(amount.toFixed(2))
+    });
+    
+    // Recalculate totals
+    let subtotal = 0;
+    invoice.items.forEach(item => {
+      subtotal += item.amount;
+    });
+    
+    const discountAmount = (subtotal * invoice.discount) / 100;
+    const subtotalAfterDiscount = subtotal - discountAmount;
+    const taxRate = invoice.tax ? invoice.tax.percentage : 0;
+    const taxAmount = (subtotalAfterDiscount * taxRate) / 100;
+    const total = subtotalAfterDiscount + taxAmount;
+    
+    invoice.subtotal = parseFloat(subtotal.toFixed(2));
+    invoice.discountAmount = parseFloat(discountAmount.toFixed(2));
+    invoice.taxAmount = parseFloat(taxAmount.toFixed(2));
+    invoice.total = parseFloat(total.toFixed(2));
+    
+    await invoice.save();
+    
+    const updatedInvoice = await Invoice.findById(invoice._id)
+      .populate('clientId', 'firstName lastName businessName email')
+      .populate('tax.taxId', 'title percentage');
+    
+    res.json({
+      success: true,
+      message: 'Item added successfully',
+      data: updatedInvoice
+    });
+    
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: 'Error adding item',
+      error: error.message
+    });
+  }
+});
+
+// UPDATE: Remove item from invoice
+router.delete('/invoice/:id/remove-item/:itemIndex', async (req, res) => {
+  try {
+    const { id, itemIndex } = req.params;
+    
+    const invoice = await Invoice.findById(id);
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invoice not found'
+      });
+    }
+    
+    if (itemIndex < 0 || itemIndex >= invoice.items.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid item index'
+      });
+    }
+    
+    // Remove item
+    invoice.items.splice(itemIndex, 1);
+    
+    if (invoice.items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot remove last item. Invoice must have at least one item.'
+      });
+    }
+    
+    // Recalculate totals
+    let subtotal = 0;
+    invoice.items.forEach(item => {
+      subtotal += item.amount;
+    });
+    
+    const discountAmount = (subtotal * invoice.discount) / 100;
+    const subtotalAfterDiscount = subtotal - discountAmount;
+    const taxRate = invoice.tax ? invoice.tax.percentage : 0;
+    const taxAmount = (subtotalAfterDiscount * taxRate) / 100;
+    const total = subtotalAfterDiscount + taxAmount;
+    
+    invoice.subtotal = parseFloat(subtotal.toFixed(2));
+    invoice.discountAmount = parseFloat(discountAmount.toFixed(2));
+    invoice.taxAmount = parseFloat(taxAmount.toFixed(2));
+    invoice.total = parseFloat(total.toFixed(2));
+    
+    await invoice.save();
+    
+    const updatedInvoice = await Invoice.findById(invoice._id)
+      .populate('clientId', 'firstName lastName businessName email')
+      .populate('tax.taxId', 'title percentage');
+    
+    res.json({
+      success: true,
+      message: 'Item removed successfully',
+      data: updatedInvoice
+    });
+    
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: 'Error removing item',
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// DELETE OPERATIONS
+// ============================================================================
+
+// DELETE: Delete invoice
+router.delete('/invoice/delete/:id', async (req, res) => {
+  try {
+    const invoice = await Invoice.findByIdAndDelete(req.params.id);
+    
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invoice not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Invoice deleted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting invoice',
+      error: error.message
+    });
+  }
+});
+
+// ============================================================================
+// DASHBOARD ENDPOINTS
+// ============================================================================
+
+// Get dashboard statistics
+router.get('/dashboard/stats', async (req, res) => {
+  try {
+    const totalInvoices = await Invoice.countDocuments();
+    const paidInvoices = await Invoice.countDocuments({ status: 'paid' });
+    const pendingInvoices = await Invoice.countDocuments({ status: 'pending' });
+    const overdueInvoices = await Invoice.countDocuments({ status: 'overdue' });
+    
+    const revenueData = await Invoice.aggregate([
+      { $match: { status: 'paid' } },
+      { $group: { _id: null, total: { $sum: '$total' } } }
+    ]);
+    
+    const pendingData = await Invoice.aggregate([
+      { $match: { status: 'pending' } },
+      { $group: { _id: null, total: { $sum: '$total' } } }
+    ]);
+    
+    const overdueData = await Invoice.aggregate([
+      { $match: { status: 'overdue' } },
+      { $group: { _id: null, total: { $sum: '$total' } } }
+    ]);
+    
+    const totalClients = await Client.countDocuments();
+    
+    res.json({
+      success: true,
+      data: {
+        totalInvoices,
+        paidInvoices,
+        pendingInvoices,
+        overdueInvoices,
+        totalRevenue: revenueData[0]?.total || 0,
+        pendingAmount: pendingData[0]?.total || 0,
+        overdueAmount: overdueData[0]?.total || 0,
+        totalClients
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching dashboard stats',
+      error: error.message
+    });
+  }
+});
+
+// Get monthly revenue chart data
+router.get('/dashboard/revenue-chart', async (req, res) => {
+  try {
+    const { year = new Date().getFullYear() } = req.query;
+    
+    const monthlyRevenue = await Invoice.aggregate([
+      {
+        $match: {
+          status: 'paid',
+          paidDate: {
+            $gte: new Date(`${year}-01-01`),
+            $lte: new Date(`${year}-12-31`)
+          }
+        }
+      },
+      {
+        $group: {
+          _id: { $month: '$paidDate' },
+          revenue: { $sum: '$total' },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+    
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const chartData = months.map((month, index) => {
+      const data = monthlyRevenue.find(item => item._id === index + 1);
+      return {
+        month,
+        revenue: data?.revenue || 0,
+        invoices: data?.count || 0
+      };
+    });
+    
+    res.json({
+      success: true,
+      data: chartData
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching revenue chart data',
+      error: error.message
+    });
+  }
+});
+
+// Get recent invoices for dashboard
+router.get('/dashboard/recent-invoices', async (req, res) => {
+  try {
+    const { limit = 5 } = req.query;
+    
+    const recentInvoices = await Invoice.find()
+      .populate('clientId', 'firstName lastName businessName')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit));
+    
+    res.json({
+      success: true,
+      data: recentInvoices
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching recent invoices',
+      error: error.message
+    });
+  }
+});
+
+module.exports = router;

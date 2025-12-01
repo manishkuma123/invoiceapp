@@ -1,0 +1,264 @@
+// const mongoose = require('mongoose');
+
+// const invoiceItemSchema = new mongoose.Schema({
+//   description: {
+//     type: String,
+//     required: true,
+//     trim: true
+//   },
+//   quantity: {
+//     type: Number,
+//     required: true,
+//     min: 0
+//   },
+//   rate: {
+//     type: Number,
+//     required: true,
+//     min: 0
+//   },
+//   amount: {
+//     type: Number,
+//     required: true,
+//     min: 0
+//   }
+// });
+
+// const invoiceSchema = new mongoose.Schema({
+
+//   invoiceType: {
+//     type: String,
+//     trim: true,
+//     default: 'Standard Invoice'
+//   },
+  
+
+//   invoiceNumber: {
+//     type: String,
+//     required: true,
+//     unique: true,
+//     trim: true
+//   },
+  
+//   // Client reference
+//   clientId: {
+//     type: mongoose.Schema.Types.ObjectId,
+//     ref: 'Client',
+//     required: true
+//   },
+  
+//   // Dates
+//   invoiceDate: {
+//     type: Date,
+//     required: true,
+//     default: Date.now
+//   },
+  
+//   dueDate: {
+//     type: Date,
+//     required: true
+//   },
+  
+//   // Invoice Details
+//   subject: {
+//     type: String,
+//     trim: true
+//   },
+  
+//   // Items/Products
+//   items: [invoiceItemSchema],
+  
+//   // Financial Calculations
+//   subtotal: {
+//     type: Number,
+//     required: true,
+//     min: 0
+//   },
+  
+//   discount: {
+//     type: Number,
+//     default: 0,
+//     min: 0,
+//     max: 100
+//   },
+  
+//   discountAmount: {
+//     type: Number,
+//     default: 0,
+//     min: 0
+//   },
+
+//   tax: {
+//     taxId: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: 'TAX'
+//     },
+//     title: String,
+//     percentage: Number
+//   },
+  
+//   taxAmount: {
+//     type: Number,
+//     default: 0,
+//     min: 0
+//   },
+  
+//   // Total Amount
+//   total: {
+//     type: Number,
+//     required: true,
+//     min: 0
+//   },
+  
+//   // Currency
+//   currency: {
+//     type: String,
+//     default: 'INR',
+//     enum: ['INR', 'USD', 'EUR', 'GBP', 'AED']
+//   },
+  
+//   // Status Management
+//   status: {
+//     type: String,
+//     enum: ['draft', 'pending', 'paid', 'overdue', 'cancelled'],
+//     default: 'pending'
+//   },
+  
+//   paidDate: {
+//     type: Date
+//   },
+  
+//   // Additional Information
+//   notes: {
+//     type: String,
+//     trim: true
+//   },
+  
+//   paymentTerms: {
+//     type: String,
+//     trim: true
+//   },
+  
+//   // Signature and Stamp (can store image URLs or base64)
+//   signature: {
+//     type: String
+//   },
+  
+//   companyStamp: {
+//     type: String
+//   }
+  
+// }, {
+//   timestamps: true
+// });
+
+// // Indexes for better query performance
+// invoiceSchema.index({ invoiceNumber: 1 });
+// invoiceSchema.index({ clientId: 1 });
+// invoiceSchema.index({ status: 1 });
+// invoiceSchema.index({ invoiceDate: -1 });
+// invoiceSchema.index({ createdAt: -1 });
+
+// // Virtual for checking if invoice is overdue
+// invoiceSchema.virtual('isOverdue').get(function() {
+//   return this.status === 'pending' && new Date() > this.dueDate;
+// });
+
+// // Pre-save middleware to update status to overdue if needed
+// invoiceSchema.pre('save', function(next) {
+//   if (this.status === 'pending' && new Date() > this.dueDate) {
+//     this.status = 'overdue';
+//   }
+//   next();
+// });
+
+
+// const Invoice = mongoose.model('Invoice', invoiceSchema);
+// module.exports = Invoice;
+
+const mongoose = require('mongoose');
+
+const InvoiceSchema = new mongoose.Schema(
+  {
+    invoiceType: {
+      type: String,
+      default: 'Standard Invoice'
+    },
+
+    invoiceNumber: {
+      type: String,
+      unique: true,
+      required: true
+    },
+
+    clientId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Client',
+      required: true
+    },
+
+    subject: {
+      type: String,
+      default: ''
+    },
+
+    invoiceDate: {
+      type: Date,
+      default: Date.now
+    },
+
+    dueDate: {
+      type: Date
+    },
+
+    items: [
+      {
+        description: { type: String, required: true },
+        quantity: { type: Number, required: true },
+        rate: { type: Number, required: true },
+        amount: { type: Number, required: true },
+        itemDiscount
+      }
+    ],
+
+    subtotal: { type: Number, required: true, default: 0 },
+    discount: { type: Number, default: 0 },              
+    discountAmount: { type: Number, default: 0 },
+
+    tax: {
+      taxId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Tax',
+        default: null
+      },
+      title: String,
+      percentage: Number
+    },
+
+    taxAmount: { type: Number, default: 0 },
+    total: { type: Number, required: true, default: 0 },
+
+    currency: {
+      type: String,
+      default: 'INR'
+    },
+
+    notes: { type: String, default: '' },
+    paymentTerms: { type: String, default: '' },
+    signature: { type: String, default: '' },
+    companyStamp: { type: String, default: '' },
+
+    status: {
+      type: String,
+      enum: ['pending', 'paid', 'overdue', 'cancelled', 'draft'],
+      default: 'pending'
+    },
+
+    paidDate: {
+      type: Date,
+      default: null
+    }
+  },
+  { timestamps: true }
+);
+
+module.exports = mongoose.model('Invoice', InvoiceSchema);
