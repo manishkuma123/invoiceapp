@@ -89,32 +89,23 @@ const mongoose = require('mongoose');
 
 const InvoiceSchema = new mongoose.Schema(
   {
-    invoiceType: { type: String, default: 'Standard Invoice' },
-
+    invoiceType: { type: String },
     invoiceNumber: { type: String, unique: true, required: true },
-
     clientId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Client',
       required: true
     },
-
         invoiceDate: {
       type: Date,
       default: Date.now
     },
-
     dueDate: {
       type: Date
     },
-
     subject: { type: String, default: '' },
-
     invoiceDate: { type: Date, default: Date.now },
     dueDate: { type: Date },
-
-       
-  
     items: [
       {
         description: { type: String },
@@ -124,22 +115,13 @@ const InvoiceSchema = new mongoose.Schema(
         // amount: { type: Number }
       }
     ],
-
-
-    total: { type: Number, default: 0 },
-
-    // discount: { type: Number, default: 0 },      
+    total: { type: Number, default: 0 },      
     discountAmount: { type: Number, default: 0 },
-
     tax: {
      type: mongoose.Schema.Types.ObjectId, ref: 'TAX', default: null 
     },
-
- 
     roundOff: { type: Number, default: 0 },
-
     totalamount: { type: Number, default: 0 },
-
     currency: { type: String, default: 'INR' },
     status: {
       type: String,
@@ -147,10 +129,8 @@ const InvoiceSchema = new mongoose.Schema(
       default: 'pending'
     },
     notes: { type: String, default: '' },
-   
     signature: { type: String, default: '' },
     companyStamp: { type: String, default: '' },
-
   },
   { timestamps: true }
 );
