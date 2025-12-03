@@ -101,6 +101,11 @@ app.post('/api/organization/setup', authenticateToken, upload.fields([
         message: "Organization name is required"
       });
     }
+const userId = req.user.userId;
+const userEmail = req.user.email; // ✅ user's email
+
+console.log('User ID:', userId);
+console.log('User Email:', userEmail);
 
     const existingOrg = await Organization.findOne({ userId: req.user.userId });
     if (existingOrg) {
@@ -151,6 +156,10 @@ app.post('/api/organization/setup', authenticateToken, upload.fields([
     res.status(201).json({
       success: true,
       message: "Organization setup completed successfully",
+       user: {
+    id: userId,
+    email: userEmail
+  },
       organization: {
         id: populatedOrg._id,
         organizationName: populatedOrg.organizationName,
