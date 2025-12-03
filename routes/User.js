@@ -397,16 +397,16 @@ router.post('/login/verify-otp', async (req, res) => {
       if (organization) {
         organizationData = {
           id: organization._id,
-          // organizationName: organization.organizationName,
-          // businessType: organization.businessType?.name,
+          organizationName: organization.organizationName,
+          businessType: organization.businessType?.name,
           state: organization.state,
           country: organization.country,
-          // currency: organization.currency,
-          // language: organization.language,
-          // signature: organization.signature,
-          // companySealing: organization.companySealing,
-          // logo: organization.logo,
-          // isSetupComplete: organization.isSetupComplete
+          currency: organization.currency,
+          language: organization.language,
+          signature: organization.signature,
+          companySealing: organization.companySealing,
+          logo: organization.logo,
+          isSetupComplete: organization.isSetupComplete
         };
       }
     }
