@@ -55,13 +55,13 @@ const authenticateToken = (req, res, next) => {
   jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-this', (err, user) => {
     if (err) {
       if (err.name === 'TokenExpiredError') {
-        // Token has expired
+  
         return res.status(403).json({ 
           success: false,
           message: 'Token expired'
         });
       } else {
-        // Other errors (invalid signature, malformed token, etc.)
+        
         return res.status(403).json({ 
           success: false,
           message: 'Invalid token'
@@ -75,116 +75,7 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// const authenticateToken = (req, res, next) => {
-//   const authHeader = req.headers['authorization'];
-//   const token = authHeader && authHeader.split(' ')[1];
 
-//   if (!token) {
-//     return res.status(401).json({ 
-//       success: false,
-//       message: 'Access token required' 
-//     });
-//   }
-
-//   jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-this', (err, user) => {
-//     if (err) {
-//       return res.status(403).json({ 
-//         success: false,
-//         message: 'Invalid or expired token' 
-//       });
-//     }
-//     req.user = user;
-//     next();
-//   });
-// }; 
-// when user signup /login then hasCompletedOrgSetup true /false base on hasCompletedOrgSetup have to redirect home or organization redirect from froentend only not in backend 
-// app.post('/api/organization/setup', authenticateToken, upload.fields([
-//   { name: "signature", maxCount: 1 },
-//   { name: "companySealing", maxCount: 1 },
-//   { name: "logo", maxCount: 1 }
-// ]), async (req, res) => {
-//   try {
-//     const {
-//       organizationName,
-//       businessType,
-//       state,
-//       location,
-//       currency,
-//       language
-//     } = req.body;
-
-//     if (!organizationName) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Organization name is required"
-//       });
-//     }
-
-//     const existingOrg = await Organization.findOne({ userId: req.user.userId });
-//     if (existingOrg) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Organization already setup for this user"
-//       });
-//     }
-
-
-//     const categoryExists = await Category.findOne({ name: businessType });
-//     if (!categoryExists) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid businessType: Category not found"
-//       });
-//     }
-
-//     const signatureUrl = req.files?.signature?.[0]?.path || null;
-//     const companySealingUrl = req.files?.companySealing?.[0]?.path || null;
-//     const logoUrl = req.files?.logo?.[0]?.path || null;
-
-//     const newOrganization = new Organization({
-//       userId: req.user.userId,
-//       organizationName,
-//       businessType: categoryExists._id, 
-//       state,
-//       location,
-//       currency: currency || "USD",
-//       language: language || "English",
-//       signature: signatureUrl,
-//       companySealing: companySealingUrl,
-//       logo: logoUrl,
-//       isSetupComplete: true
-//     });
-
-//     await newOrganization.save();
-
-//     const populatedOrg = await Organization.findById(newOrganization._id)
-//       .populate("businessType", "name");
-
-//     res.status(201).json({
-//       success: true,
-//       message: "Organization setup completed successfully",
-//       organization: {
-//         id: populatedOrg._id,
-//         organizationName: populatedOrg.organizationName,
-//         businessType: populatedOrg.businessType?.name,
-//         state: populatedOrg.state,
-//         location: populatedOrg.location,
-//         currency: populatedOrg.currency,
-//         language: populatedOrg.language,
-//         signature: populatedOrg.signature,          
-//         companySealing: populatedOrg.companySealing,
-//         logo: populatedOrg.logo                     
-//       }
-//     });
-
-//   } catch (error) {
-//     console.error("❌ Organization setup error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Server error. Please try again later."
-//     });
-//   }
-// });
 app.use('/api/tax',authenticateToken, taxroutes);
 app.use('/api/organization',organizationrouter)
 app.use('/api' ,  authenticateToken,invoicedata)
@@ -198,7 +89,8 @@ app.post('/api/organization/setup', authenticateToken, upload.fields([
       organizationName,
       businessType,
       state,
-      location,
+      // location,
+       country,
       currency,
       language
     } = req.body;
@@ -235,7 +127,8 @@ app.post('/api/organization/setup', authenticateToken, upload.fields([
       organizationName,
       businessType: categoryExists._id, 
       state,
-      location,
+      // location,
+       country,
       currency: currency || "USD",
       language: language || "English",
       signature: signatureUrl,
@@ -263,7 +156,8 @@ app.post('/api/organization/setup', authenticateToken, upload.fields([
         organizationName: populatedOrg.organizationName,
         businessType: populatedOrg.businessType?.name,
         state: populatedOrg.state,
-        location: populatedOrg.location,
+        // location: populatedOrg.location,
+         country: populatedOrg.country,
         currency: populatedOrg.currency,
         language: populatedOrg.language,
         signature: populatedOrg.signature,          
@@ -281,94 +175,6 @@ app.post('/api/organization/setup', authenticateToken, upload.fields([
   }
 });
 app.use('/api/organization/businesstype/category',authenticateToken, categoryroutes);
-// app.post('/api/organization/setup', authenticateToken, upload.fields([
-//   { name: "signature", maxCount: 1 },
-//   { name: "companySealing", maxCount: 1 },
-//   { name: "logo", maxCount: 1 }
-// ]), async (req, res) => {
-//   try {
-//     const {
-//       organizationName,
-//       businessType,
-//       state,
-//       location,
-//       currency,
-//       language
-//     } = req.body;
-
-//     if (!organizationName) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Organization name is required"
-//       });
-//     }
-
-//     const existingOrg = await Organization.findOne({ userId: req.user.userId });
-//     if (existingOrg) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Organization already setup for this user"
-//       });
-//     }
-
-//     const categoryExists = await Category.findById(businessType);
-//     if (!categoryExists) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid businessType: Category not found"
-//       });
-//     }
-
-//     const signatureUrl = req.files?.signature?.[0]?.path || null;
-//     const companySealingUrl = req.files?.companySealing?.[0]?.path || null;
-//     const logoUrl = req.files?.logo?.[0]?.path || null;
-
-//     const newOrganization = new Organization({
-       
-//       userId: req.user.userId,
-//       organizationName,
-//       businessType,
-//       state,
-//       location,
-//       currency: currency || "USD",
-//       language: language || "English",
-//       signature: signatureUrl,
-//       companySealing: companySealingUrl,
-//       logo: logoUrl,
-//       isSetupComplete: true
-//     });
-
-//     await newOrganization.save();
-
-//     const populatedOrg = await Organization.findById(newOrganization._id)
-//       .populate("businessType", "name");
-
-//     res.status(201).json({
-//       success: true,
-//       message: "Organization setup completed successfully",
-//       organization: {
-//         id: populatedOrg._id,
-//         organizationName: populatedOrg.organizationName,
-//         businessType: populatedOrg.businessType?.name,
-//         state: populatedOrg.state,
-//         location: populatedOrg.location,
-//         currency: populatedOrg.currency,
-//         language: populatedOrg.language,
-//         signature: populatedOrg.signature,          
-//         companySealing: populatedOrg.companySealing,
-//         logo: populatedOrg.logo                     
-//       }
-//     });
-
-//   } catch (error) {
-//     console.error("❌ Organization setup error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Server error. Please try again later."
-//     });
-//   }
-// });
-
 app.use('/uploads', express.static('uploads'));
 app.use('/api', authenticateToken,Clientroutes)
 app.use((req, res) => {

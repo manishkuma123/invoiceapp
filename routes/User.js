@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const sgMail = require('@sendgrid/mail');
 const User = require('../schema/User');
 const OTP = require('../schema/Otp');
-
+const Organization = require('../schema/organization');
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 function generateOTP() {
@@ -387,6 +387,30 @@ router.post('/login/verify-otp', async (req, res) => {
       { expiresIn: '7d' }
     );
 
+  
+    let organizationData = null;
+    
+    if (user.hasCompletedOrgSetup) {
+      const organization = await Organization.findOne({ userId: user._id })
+        .populate('businessType', 'name');
+      
+      if (organization) {
+        organizationData = {
+          id: organization._id,
+          // organizationName: organization.organizationName,
+          // businessType: organization.businessType?.name,
+          state: organization.state,
+          country: organization.country,
+          // currency: organization.currency,
+          // language: organization.language,
+          // signature: organization.signature,
+          // companySealing: organization.companySealing,
+          // logo: organization.logo,
+          // isSetupComplete: organization.isSetupComplete
+        };
+      }
+    }
+
     console.log(`✅ User logged in: ${email}`);
 
     res.status(200).json({
@@ -397,8 +421,9 @@ router.post('/login/verify-otp', async (req, res) => {
         email: user.email,
         name: user.name,
         isVerified: user.isVerified,
-        hasCompletedOrgSetup: user.hasCompletedOrgSetup 
+        hasCompletedOrgSetup: user.hasCompletedOrgSetup
       },
+      organization: organizationData, 
       token
     });
 
@@ -410,6 +435,78 @@ router.post('/login/verify-otp', async (req, res) => {
     });
   }
 });
+// router.post('/login/verify-otp', async (req, res) => {
+//   try {
+//     const { email, otp } = req.body;
+
+//     if (!email || !otp) {
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'Email and OTP are required' 
+//       });
+//     }
+
+//     const otpRecord = await OTP.findOne({ 
+//       email: email.toLowerCase(), 
+//       purpose: 'login' 
+//     });
+
+//     if (!otpRecord) {
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'OTP expired or not found. Please request a new OTP.' 
+//       });
+//     }
+
+//     if (otpRecord.otp !== otp.toString()) {
+//       return res.status(400).json({ 
+//         success: false,
+//         message: 'Invalid OTP. Please check and try again.' 
+//       });
+//     }
+
+//     const user = await User.findOne({ email: email.toLowerCase() });
+//     if (!user) {
+//       return res.status(404).json({ 
+//         success: false,
+//         message: 'User not found' 
+//       });
+//     }
+
+//     await OTP.deleteOne({ email: email.toLowerCase() });
+
+//     const token = jwt.sign(
+//       { 
+//         userId: user._id, 
+//         email: user.email 
+//       },
+//       process.env.JWT_SECRET || 'your-secret-key-change-this',
+//       { expiresIn: '7d' }
+//     );
+
+//     console.log(`✅ User logged in: ${email}`);
+
+//     res.status(200).json({
+//       success: true,
+//       message: 'Login successful',
+//       user: {
+//         id: user._id,
+//         email: user.email,
+//         name: user.name,
+//         isVerified: user.isVerified,
+//         hasCompletedOrgSetup: user.hasCompletedOrgSetup 
+//       },
+//       token
+//     });
+
+//   } catch (error) {
+//     console.error('❌ Login error:', error);
+//     res.status(500).json({ 
+//       success: false,
+//       message: 'Server error. Please try again later.' 
+//     });
+//   }
+// });
 
 router.post('/login/resend-otp', async (req, res) => {
   try {

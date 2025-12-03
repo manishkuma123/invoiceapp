@@ -20,12 +20,12 @@ const organizationSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
- 
-  
-  location: { 
+  country: {  
     type: String,
     trim: true
   },
+  
+
   currency: { 
     type: String,
     default: 'USD'
