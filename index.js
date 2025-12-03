@@ -1,5 +1,6 @@
 const express = require('express');
 const upload = require("./config/upload");
+const User = require('./schema/User'); 
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const sgMail = require('@sendgrid/mail');
@@ -144,8 +145,8 @@ console.log('User Email:', userEmail);
 
     await newOrganization.save();
 
-    // ✅ UPDATE USER'S hasCompletedOrgSetup FLAG
-    const User = require('./schema/User'); // Import User model
+    
+   // Import User model
     await User.findByIdAndUpdate(req.user.userId, {
       hasCompletedOrgSetup: true
     });

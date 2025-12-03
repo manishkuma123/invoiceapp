@@ -923,154 +923,288 @@ router.patch('/invoice/status/:id', async (req, res) => {
 // const upload = require("../config/upload");    
 
 // Create invoice - userId added from token automatically
-router.post(
-  "/invoice/add",
-  upload.fields([
-    { name: "signature", maxCount: 1 },
-    { name: "companyStamp", maxCount: 1 }
-  ]),
-  async (req, res) => {
+// router.post(
+//   "/invoice/add",
+//   upload.fields([
+//     { name: "signature", maxCount: 1 },
+//     { name: "companyStamp", maxCount: 1 }
+//   ]),
+//   async (req, res) => {
+//     try {
+//       const {
+//         invoiceType,
+//         invoiceNumber,
+//         clientId,
+//         items,
+//         total,
+//         discount,
+//         discountAmount,
+//         tax,
+//         roundOff,
+//         totalamount,
+//         currency,
+//         notes,
+//         invoiceDate,
+//         dueDate,
+//         subject,
+//         paymentTerms,
+//         status
+//       } = req.body;
+
+
+//       if (!clientId || !items) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Client ID and items are required"
+//         });
+//       }
+
+//       let parsedItems = [];
+//       try {
+//         parsedItems = JSON.parse(items);
+//       } catch (err) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid items JSON"
+//         });
+//       }
+
+
+//       const client = await Client.findOne({ 
+//         _id: clientId, 
+//         userId: req.user.userId 
+//       });
+      
+//       if (!client) {
+//         return res.status(404).json({
+//           success: false,
+//           message: "Client not found or you do not have permission to access it"
+//         });
+//       }
+
+
+//       let taxId = null;
+//       if (tax) {
+//         const taxRecord = await TAX.findOne({ 
+//           _id: tax, 
+//           userId: req.user.userId 
+//         });
+        
+//         if (!taxRecord) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "Invalid TAX ID or you do not have permission to use it"
+//           });
+//         }
+//         taxId = tax;
+//       }
+
+//       let signatureUrl = "";
+//       let stampUrl = "";
+
+//       if (req.files["signature"]) {
+//         signatureUrl = req.files["signature"][0].path;
+//       }
+
+//       if (req.files["companyStamp"]) {
+//         stampUrl = req.files["companyStamp"][0].path; 
+//       }
+
+//       const invoice = new Invoice({
+//         userId: req.user.userId, 
+//         invoiceType,
+//         invoiceNumber: invoiceNumber || `INV-${Date.now()}`,
+//         clientId,
+//         items: parsedItems,
+//         total,
+//         discount,
+//         discountAmount,
+//         tax: taxId,
+//         roundOff,
+//         totalamount,
+//         currency,
+//         notes,
+//         invoiceDate,
+//         dueDate,
+//         subject,
+//         paymentTerms,
+//         signature: signatureUrl,
+//         companyStamp: stampUrl,
+//         status
+//       });
+
+//       await invoice.save();
+
+//       const populatedInvoice = await Invoice.findById(invoice._id)
+//         .populate("clientId", "firstName lastName businessName email")
+//         .populate("tax", "title percentage");
+
+//       res.status(201).json({
+//         success: true,
+//         message: "Invoice created successfully",
+//         data: populatedInvoice
+//       });
+
+//     } catch (error) {
+//       res.status(400).json({
+//         success: false,
+//         message: "Error creating invoice",
+//         error: error.message
+//       });
+//     }
+//   }
+// );
+router.post("/invoice/add", upload.fields([
+  { name: "signature", maxCount: 1 },
+  { name: "companyStamp", maxCount: 1 }
+]), async (req, res) => {
+  try {
+    const {
+      invoiceType,
+      invoiceNumber,
+      clientId,
+      items,
+      total,
+      discount,
+      discountAmount,
+      tax,
+      roundOff,
+      totalamount,
+      currency,
+      notes,
+      invoiceDate,
+      dueDate,
+      subject,
+      paymentTerms,
+      status
+    } = req.body;
+
+    // Ensure clientId and items are provided
+    if (!clientId || !items) {
+      return res.status(400).json({
+        success: false,
+        message: "Client ID and items are required"
+      });
+    }
+
+    // Parse items JSON
+    let parsedItems = [];
     try {
-      const {
-        invoiceType,
-        invoiceNumber,
-        clientId,
-        items,
-        total,
-        discount,
-        discountAmount,
-        tax,
-        roundOff,
-        totalamount,
-        currency,
-        notes,
-        invoiceDate,
-        dueDate,
-        subject,
-        paymentTerms,
-        status
-      } = req.body;
+      parsedItems = JSON.parse(items);
+    } catch (err) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid items JSON"
+      });
+    }
 
-      // Validate required fields
-      if (!clientId || !items) {
-        return res.status(400).json({
-          success: false,
-          message: "Client ID and items are required"
-        });
-      }
+    // Fetch the client from the database
+    const client = await Client.findOne({ 
+      _id: clientId, 
+      userId: req.user.userId 
+    });
 
-      // Convert items (string from Postman) to JSON
-      let parsedItems = [];
-      try {
-        parsedItems = JSON.parse(items);
-      } catch (err) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid items JSON"
-        });
-      }
+    if (!client) {
+      return res.status(404).json({
+        success: false,
+        message: "Client not found or you do not have permission to access it"
+      });
+    }
 
-      // Check client exists AND belongs to user
-      const client = await Client.findOne({ 
-        _id: clientId, 
+    // Validate TAX ID if provided
+    let taxId = null;
+    if (tax) {
+      const taxRecord = await TAX.findOne({ 
+        _id: tax, 
         userId: req.user.userId 
       });
       
-      if (!client) {
-        return res.status(404).json({
+      if (!taxRecord) {
+        return res.status(400).json({
           success: false,
-          message: "Client not found or you do not have permission to access it"
+          message: "Invalid TAX ID or you do not have permission to use it"
         });
       }
+      taxId = tax;
+    }
 
-      // TAX ID validation - check ownership
-      let taxId = null;
-      if (tax) {
-        const taxRecord = await TAX.findOne({ 
-          _id: tax, 
-          userId: req.user.userId 
-        });
-        
-        if (!taxRecord) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid TAX ID or you do not have permission to use it"
-          });
-        }
-        taxId = tax;
-      }
+    // Handle file uploads (signature and company stamp)
+    let signatureUrl = "";
+    let stampUrl = "";
+    if (req.files["signature"]) {
+      signatureUrl = req.files["signature"][0].path;
+    }
+    if (req.files["companyStamp"]) {
+      stampUrl = req.files["companyStamp"][0].path;
+    }
 
-      // ===============================
-      // 📌 File Upload (Cloudinary URLs)
-      // ===============================
-      let signatureUrl = "";
-      let stampUrl = "";
+    // Check if the provided invoiceNumber already exists in the database
+    const existingInvoice = await Invoice.findOne({ invoiceNumber: invoiceNumber });
 
-      if (req.files["signature"]) {
-        signatureUrl = req.files["signature"][0].path; // Cloudinary URL
-      }
-
-      if (req.files["companyStamp"]) {
-        stampUrl = req.files["companyStamp"][0].path; // Cloudinary URL
-      }
-
-      // ===============================
-      // 📌 Create Invoice
-      // ===============================
-      const invoice = new Invoice({
-        userId: req.user.userId,  // ← Added from JWT token
-        invoiceType,
-        invoiceNumber: invoiceNumber || `INV-${Date.now()}`,
-        clientId,
-        items: parsedItems,
-        total,
-        discount,
-        discountAmount,
-        tax: taxId,
-        roundOff,
-        totalamount,
-        currency,
-        notes,
-        invoiceDate,
-        dueDate,
-        subject,
-        paymentTerms,
-        signature: signatureUrl,
-        companyStamp: stampUrl,
-        status
-      });
-
-      await invoice.save();
-
-      // Populate client + TAX fields
-      const populatedInvoice = await Invoice.findById(invoice._id)
-        .populate("clientId", "firstName lastName businessName email")
-        .populate("tax", "title percentage");
-
-      res.status(201).json({
-        success: true,
-        message: "Invoice created successfully",
-        data: populatedInvoice
-      });
-
-    } catch (error) {
-      res.status(400).json({
+    if (existingInvoice) {
+      return res.status(400).json({
         success: false,
-        message: "Error creating invoice",
-        error: error.message
+        message: `Invoice number ${invoiceNumber} already exists. Please choose a different number.`
       });
     }
-  }
-);
 
-// Get all invoices - filtered by userId from token
+    // Create the new invoice
+    const invoice = new Invoice({
+      userId: req.user.userId,
+      invoiceType,
+      invoiceNumber,  // Using the provided invoice number
+      clientId,
+      items: parsedItems,
+      total,
+      discount,
+      discountAmount,
+      tax: taxId,
+      roundOff,
+      totalamount,
+      currency,
+      notes,
+      invoiceDate,
+      dueDate,
+      subject,
+      paymentTerms,
+      signature: signatureUrl,
+      companyStamp: stampUrl,
+      status
+    });
+
+    // Save the invoice to the database
+    await invoice.save();
+
+    // Populate the invoice with related client and tax data
+    const populatedInvoice = await Invoice.findById(invoice._id)
+      .populate("clientId", "firstName lastName businessName email")
+      .populate("tax", "title percentage");
+
+    // Return a successful response
+    res.status(201).json({
+      success: true,
+      message: "Invoice created successfully",
+      data: populatedInvoice
+    });
+
+  } catch (error) {
+    // Handle any errors during the process
+    res.status(400).json({
+      success: false,
+      message: "Error creating invoice",
+      error: error.message
+    });
+  }
+});
+
+
 router.get("/invoice/all", async (req, res) => { 
   try {
     const { page = 1, limit = 10, search, status, startDate, endDate } = req.query;
     
-    const query = { userId: req.user.userId };  // ← Filter by token userId
+    const query = { userId: req.user.userId }; 
     
-    // Optional search functionality
+   
     if (search) {
       query.$or = [
         { invoiceNumber: { $regex: search, $options: 'i' } },
@@ -1078,12 +1212,11 @@ router.get("/invoice/all", async (req, res) => {
       ];
     }
     
-    // Filter by status
+ 
     if (status) {
       query.status = status;
     }
-    
-    // Filter by date range
+
     if (startDate || endDate) {
       query.invoiceDate = {};
       if (startDate) query.invoiceDate.$gte = new Date(startDate);
