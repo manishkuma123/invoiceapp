@@ -546,261 +546,288 @@ const TAX = require('../schema/Tax');
 
 const upload = require("../config/upload");    
 
-router.post(
-  "/invoice/add",
-  upload.fields([
-    { name: "signature", maxCount: 1 },
-    { name: "companyStamp", maxCount: 1 }
-  ]),
-  async (req, res) => {
-    try {
-      const {
-        invoiceType,
-        invoiceNumber,
-        clientId,
-        items,
-        total,
-        discount,
-        discountAmount,
-        tax,
-        // taxAmount,
-        roundOff,
-        totalamount,
-        currency,
-        notes,
-        invoiceDate,
-        dueDate,
-        subject,
-        paymentTerms,
-        status
-      } = req.body;
+// router.post(
+//   "/invoice/add",
+//   upload.fields([
+//     { name: "signature", maxCount: 1 },
+//     { name: "companyStamp", maxCount: 1 }
+//   ]),
+//   async (req, res) => {
+//     try {
+//       const {
+//         invoiceType,
+//         invoiceNumber,
+//         clientId,
+//         items,
+//         total,
+//         discount,
+//         discountAmount,
+//         tax,
+//         // taxAmount,
+//         roundOff,
+//         totalamount,
+//         currency,
+//         notes,
+//         invoiceDate,
+//         dueDate,
+//         subject,
+//         paymentTerms,
+//         status
+//       } = req.body;
 
-      // Validate required fields
-      if (!clientId || !items) {
-        return res.status(400).json({
-          success: false,
-          message: "Client ID and items are required"
-        });
-      }
+//       // Validate required fields
+//       if (!clientId || !items) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Client ID and items are required"
+//         });
+//       }
 
-      // Convert items (string from Postman) to JSON
-      let parsedItems = [];
-      try {
-        parsedItems = JSON.parse(items);
-      } catch (err) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid items JSON"
-        });
-      }
+//       // Convert items (string from Postman) to JSON
+//       let parsedItems = [];
+//       try {
+//         parsedItems = JSON.parse(items);
+//       } catch (err) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid items JSON"
+//         });
+//       }
 
-      // Check client exists
-      const client = await Client.findById(clientId);
-      if (!client) {
-        return res.status(404).json({
-          success: false,
-          message: "Client not found"
-        });
-      }
+//       // Check client exists
+//       const client = await Client.findById(clientId);
+//       if (!client) {
+//         return res.status(404).json({
+//           success: false,
+//           message: "Client not found"
+//         });
+//       }
 
-      // TAX ID validation
-      let taxId = null;
-      if (tax) {
-        const taxRecord = await TAX.findById(tax);
-        if (!taxRecord) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid TAX ID"
-          });
-        }
-        taxId = tax;
-      }
+//       // TAX ID validation
+//       let taxId = null;
+//       if (tax) {
+//         const taxRecord = await TAX.findById(tax);
+//         if (!taxRecord) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "Invalid TAX ID"
+//           });
+//         }
+//         taxId = tax;
+//       }
 
-      // ===============================
-      // 📌 File Upload (Cloudinary URLs)
-      // ===============================
-      let signatureUrl = "";
-      let stampUrl = "";
+//       // ===============================
+//       // 📌 File Upload (Cloudinary URLs)
+//       // ===============================
+//       let signatureUrl = "";
+//       let stampUrl = "";
 
-      if (req.files["signature"]) {
-        signatureUrl = req.files["signature"][0].path; // Cloudinary URL
-      }
+//       if (req.files["signature"]) {
+//         signatureUrl = req.files["signature"][0].path; // Cloudinary URL
+//       }
 
-      if (req.files["companyStamp"]) {
-        stampUrl = req.files["companyStamp"][0].path; // Cloudinary URL
-      }
+//       if (req.files["companyStamp"]) {
+//         stampUrl = req.files["companyStamp"][0].path; // Cloudinary URL
+//       }
 
-      // ===============================
-      // 📌 Create Invoice
-      // ===============================
-      const invoice = new Invoice({
-        invoiceType,
-        invoiceNumber: invoiceNumber || `INV-${Date.now()}`,
-        clientId,
-        items: parsedItems,
-        total,
-        discount,
-        discountAmount,
-        tax: taxId,
-        // taxAmount,
-        roundOff,
-        totalamount,
-        currency,
-        notes,
-        invoiceDate,
-        dueDate,
-        subject,
-        paymentTerms,
-        signature: signatureUrl,
-        companyStamp: stampUrl,
-        status
-      });
+//       // ===============================
+//       // 📌 Create Invoice
+//       // ===============================
+//       const invoice = new Invoice({
+//         invoiceType,
+//         invoiceNumber: invoiceNumber || `INV-${Date.now()}`,
+//         clientId,
+//         items: parsedItems,
+//         total,
+//         discount,
+//         discountAmount,
+//         tax: taxId,
+//         // taxAmount,
+//         roundOff,
+//         totalamount,
+//         currency,
+//         notes,
+//         invoiceDate,
+//         dueDate,
+//         subject,
+//         paymentTerms,
+//         signature: signatureUrl,
+//         companyStamp: stampUrl,
+//         status
+//       });
 
-      await invoice.save();
+//       await invoice.save();
 
-      // Populate client + TAX fields
-      const populatedInvoice = await Invoice.findById(invoice._id)
-        .populate("clientId", "firstName lastName businessName email")
-        .populate("tax", "title percentage");
+//       // Populate client + TAX fields
+//       const populatedInvoice = await Invoice.findById(invoice._id)
+//         .populate("clientId", "firstName lastName businessName email")
+//         .populate("tax", "title percentage");
 
-      res.status(201).json({
-        success: true,
-        message: "Invoice created successfully",
-        data: populatedInvoice
-      });
+//       res.status(201).json({
+//         success: true,
+//         message: "Invoice created successfully",
+//         data: populatedInvoice
+//       });
 
-    } catch (error) {
-      res.status(400).json({
-        success: false,
-        message: "Error creating invoice",
-        error: error.message
-      });
-    }
-  }
-);
-router.get("/invoice/all", async (req, res) => { 
-  try {
-    const invoices = await Invoice.find()
-      .populate("clientId", "firstName lastName businessName email")
-      .populate("tax", "title percentage")
-      .sort({ createdAt: -1 });
+//     } catch (error) {
+//       res.status(400).json({
+//         success: false,
+//         message: "Error creating invoice",
+//         error: error.message
+//       });
+//     }
+//   }
+// );
+// router.get("/invoice/all", async (req, res) => { 
+//   try {
+//     const invoices = await Invoice.find()
+//       .populate("clientId", "firstName lastName businessName email")
+//       .populate("tax", "title percentage")
+//       .sort({ createdAt: -1 });
 
-    return res.status(200).json({
-      success: true,
-      message: "Invoices fetched successfully",
-      count: invoices.length,
-      data: invoices
-    });
+//     return res.status(200).json({
+//       success: true,
+//       message: "Invoices fetched successfully",
+//       count: invoices.length,
+//       data: invoices
+//     });
 
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Error fetching invoices",
-      error: error.message
-    });
-  }
-});
-router.put(
-  "/invoice/update/:id",
-  upload.fields([
-    { name: "signature", maxCount: 1 },
-    { name: "companyStamp", maxCount: 1 }
-  ]),
-  async (req, res) => {
-    try {
-      const invoiceId = req.params.id;
+//   } catch (error) {
+//     return res.status(500).json({
+//       success: false,
+//       message: "Error fetching invoices",
+//       error: error.message
+//     });
+//   }
+// });
+// router.put(
+//   "/invoice/update/:id",
+//   upload.fields([
+//     { name: "signature", maxCount: 1 },
+//     { name: "companyStamp", maxCount: 1 }
+//   ]),
+//   async (req, res) => {
+//     try {
+//       const invoiceId = req.params.id;
 
-      const invoice = await Invoice.findById(invoiceId);
-      if (!invoice) {
-        return res.status(404).json({
-          success: false,
-          message: "Invoice not found"
-        });
-      }
+//       const invoice = await Invoice.findById(invoiceId);
+//       if (!invoice) {
+//         return res.status(404).json({
+//           success: false,
+//           message: "Invoice not found"
+//         });
+//       }
 
-      let updatedData = { ...req.body };
+//       let updatedData = { ...req.body };
 
-      // Handle items JSON (if sent)
-      if (req.body.items) {
-        try {
-          updatedData.items = JSON.parse(req.body.items);
-        } catch (err) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid items JSON"
-          });
-        }
-      }
+//       // Handle items JSON (if sent)
+//       if (req.body.items) {
+//         try {
+//           updatedData.items = JSON.parse(req.body.items);
+//         } catch (err) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "Invalid items JSON"
+//           });
+//         }
+//       }
 
-      // Validate TAX ID if updating
-      if (req.body.tax) {
-        const taxRecord = await TAX.findById(req.body.tax);
-        if (!taxRecord) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid TAX ID"
-          });
-        }
-      }
+//       // Validate TAX ID if updating
+//       if (req.body.tax) {
+//         const taxRecord = await TAX.findById(req.body.tax);
+//         if (!taxRecord) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "Invalid TAX ID"
+//           });
+//         }
+//       }
 
-      // File uploads
-      if (req.files["signature"]) {
-        updatedData.signature = req.files["signature"][0].path;
-      }
+//       // File uploads
+//       if (req.files["signature"]) {
+//         updatedData.signature = req.files["signature"][0].path;
+//       }
 
-      if (req.files["companyStamp"]) {
-        updatedData.companyStamp = req.files["companyStamp"][0].path;
-      }
+//       if (req.files["companyStamp"]) {
+//         updatedData.companyStamp = req.files["companyStamp"][0].path;
+//       }
 
-      const updatedInvoice = await Invoice.findByIdAndUpdate(
-        invoiceId,
-        updatedData,
-        { new: true }
-      )
-        .populate("clientId")
-        .populate("tax");
+//       const updatedInvoice = await Invoice.findByIdAndUpdate(
+//         invoiceId,
+//         updatedData,
+//         { new: true }
+//       )
+//         .populate("clientId")
+//         .populate("tax");
 
-      res.status(200).json({
-        success: true,
-        message: "Invoice updated successfully",
-        data: updatedInvoice
-      });
+//       res.status(200).json({
+//         success: true,
+//         message: "Invoice updated successfully",
+//         data: updatedInvoice
+//       });
 
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: "Error updating invoice",
-        error: error.message
-      });
-    }
-  }
-);
-router.delete("/invoice/delete/:id", async (req, res) => {
-  try {
-    const invoiceId = req.params.id;
+//     } catch (error) {
+//       res.status(500).json({
+//         success: false,
+//         message: "Error updating invoice",
+//         error: error.message
+//       });
+//     }
+//   }
+// );
+// router.delete("/invoice/delete/:id", async (req, res) => {
+//   try {
+//     const invoiceId = req.params.id;
 
-    const invoice = await Invoice.findByIdAndDelete(invoiceId);
+//     const invoice = await Invoice.findByIdAndDelete(invoiceId);
 
-    if (!invoice) {
-      return res.status(404).json({
-        success: false,
-        message: "Invoice not found"
-      });
-    }
+//     if (!invoice) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Invoice not found"
+//       });
+//     }
 
-    return res.status(200).json({
-      success: true,
-      message: "Invoice deleted successfully"
-    });
+//     return res.status(200).json({
+//       success: true,
+//       message: "Invoice deleted successfully"
+//     });
 
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Error deleting invoice",
-      error: error.message
-    });
-  }
-});
+//   } catch (error) {
+//     return res.status(500).json({
+//       success: false,
+//       message: "Error deleting invoice",
+//       error: error.message
+//     });
+//   }
+// });
+
+
+// router.delete('/invoice/delete/:id', async (req, res) => {
+//   try {
+//     const invoice = await Invoice.findByIdAndDelete(req.params.id);
+    
+//     if (!invoice) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'Invoice not found'
+//       });
+//     }
+    
+//     res.json({
+//       success: true,
+//       message: 'Invoice deleted successfully',
+//       data: invoice
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       message: 'Error deleting invoice',
+//       error: error.message
+//     });
+//   }
+// });
+
 
 router.get('/invoice/status/:id', async (req, res) => {
   try {
@@ -833,8 +860,6 @@ router.get('/invoice/status/:id', async (req, res) => {
     });
   }
 });
-
-
 router.patch('/invoice/status/:id', async (req, res) => {
   try {
     const { status } = req.body;
@@ -879,308 +904,383 @@ router.patch('/invoice/status/:id', async (req, res) => {
     });
   }
 });
-// router.patch('/invoice/status/:id', async (req, res) => {
-//   try {
-//     const { status } = req.body;
-    
-//     if (!['pending', 'paid', 'overdue', 'cancelled', 'draft'].includes(status)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Invalid status. Must be: pending, paid, overdue, cancelled, or draft'
-//       });
-//     }
-    
-//     const invoice = await Invoice.findByIdAndUpdate(
-//       req.params.id,
-//       { status, paidDate: status === 'paid' ? new Date() : null },
-//       { new: true }
-//     ).populate('clientId', 'firstName lastName businessName email');
-    
-//     if (!invoice) {
-//       return res.status(404).json({
-//         success: false,
-//         message: 'Invoice not found'
-//       });
-//     }
-    
-//     res.json({
-//       success: true,
-//       message: 'Invoice status updated successfully',
-//       data: invoice
-//     });
-//   } catch (error) {
-//     res.status(400).json({
-//       success: false,
-//       message: 'Error updating invoice status',
-//       error: error.message
-//     });
-//   }
-// });
-router.delete('/invoice/delete/:id', async (req, res) => {
+
+
+
+
+
+
+
+
+// module.exports = router;
+
+// const express = require('express');
+// const router = express.Router();
+// const Invoice = require('../schema/Invoice');
+// const Client = require('../schema/Client');
+// const TAX = require('../schema/Tax');
+
+// const upload = require("../config/upload");    
+
+// Create invoice - userId added from token automatically
+router.post(
+  "/invoice/add",
+  upload.fields([
+    { name: "signature", maxCount: 1 },
+    { name: "companyStamp", maxCount: 1 }
+  ]),
+  async (req, res) => {
+    try {
+      const {
+        invoiceType,
+        invoiceNumber,
+        clientId,
+        items,
+        total,
+        discount,
+        discountAmount,
+        tax,
+        roundOff,
+        totalamount,
+        currency,
+        notes,
+        invoiceDate,
+        dueDate,
+        subject,
+        paymentTerms,
+        status
+      } = req.body;
+
+      // Validate required fields
+      if (!clientId || !items) {
+        return res.status(400).json({
+          success: false,
+          message: "Client ID and items are required"
+        });
+      }
+
+      // Convert items (string from Postman) to JSON
+      let parsedItems = [];
+      try {
+        parsedItems = JSON.parse(items);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid items JSON"
+        });
+      }
+
+      // Check client exists AND belongs to user
+      const client = await Client.findOne({ 
+        _id: clientId, 
+        userId: req.user.userId 
+      });
+      
+      if (!client) {
+        return res.status(404).json({
+          success: false,
+          message: "Client not found or you do not have permission to access it"
+        });
+      }
+
+      // TAX ID validation - check ownership
+      let taxId = null;
+      if (tax) {
+        const taxRecord = await TAX.findOne({ 
+          _id: tax, 
+          userId: req.user.userId 
+        });
+        
+        if (!taxRecord) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid TAX ID or you do not have permission to use it"
+          });
+        }
+        taxId = tax;
+      }
+
+      // ===============================
+      // 📌 File Upload (Cloudinary URLs)
+      // ===============================
+      let signatureUrl = "";
+      let stampUrl = "";
+
+      if (req.files["signature"]) {
+        signatureUrl = req.files["signature"][0].path; // Cloudinary URL
+      }
+
+      if (req.files["companyStamp"]) {
+        stampUrl = req.files["companyStamp"][0].path; // Cloudinary URL
+      }
+
+      // ===============================
+      // 📌 Create Invoice
+      // ===============================
+      const invoice = new Invoice({
+        userId: req.user.userId,  // ← Added from JWT token
+        invoiceType,
+        invoiceNumber: invoiceNumber || `INV-${Date.now()}`,
+        clientId,
+        items: parsedItems,
+        total,
+        discount,
+        discountAmount,
+        tax: taxId,
+        roundOff,
+        totalamount,
+        currency,
+        notes,
+        invoiceDate,
+        dueDate,
+        subject,
+        paymentTerms,
+        signature: signatureUrl,
+        companyStamp: stampUrl,
+        status
+      });
+
+      await invoice.save();
+
+      // Populate client + TAX fields
+      const populatedInvoice = await Invoice.findById(invoice._id)
+        .populate("clientId", "firstName lastName businessName email")
+        .populate("tax", "title percentage");
+
+      res.status(201).json({
+        success: true,
+        message: "Invoice created successfully",
+        data: populatedInvoice
+      });
+
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: "Error creating invoice",
+        error: error.message
+      });
+    }
+  }
+);
+
+// Get all invoices - filtered by userId from token
+router.get("/invoice/all", async (req, res) => { 
   try {
-    const invoice = await Invoice.findByIdAndDelete(req.params.id);
+    const { page = 1, limit = 10, search, status, startDate, endDate } = req.query;
+    
+    const query = { userId: req.user.userId };  // ← Filter by token userId
+    
+    // Optional search functionality
+    if (search) {
+      query.$or = [
+        { invoiceNumber: { $regex: search, $options: 'i' } },
+        { subject: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    // Filter by status
+    if (status) {
+      query.status = status;
+    }
+    
+    // Filter by date range
+    if (startDate || endDate) {
+      query.invoiceDate = {};
+      if (startDate) query.invoiceDate.$gte = new Date(startDate);
+      if (endDate) query.invoiceDate.$lte = new Date(endDate);
+    }
+
+    const invoices = await Invoice.find(query)
+      .populate("clientId", "firstName lastName businessName email")
+      .populate("tax", "title percentage")
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ createdAt: -1 });
+
+    const count = await Invoice.countDocuments(query);
+
+    return res.status(200).json({
+      success: true,
+      message: "Invoices fetched successfully",
+      data: invoices,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+      totalInvoices: count
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching invoices",
+      error: error.message
+    });
+  }
+});
+
+// Get single invoice by ID - with ownership check
+router.get("/invoice/:id", async (req, res) => {
+  try {
+    const invoice = await Invoice.findOne({ 
+      _id: req.params.id, 
+      userId: req.user.userId  // ← Ownership check
+    })
+      .populate("clientId", "firstName lastName businessName email")
+      .populate("tax", "title percentage");
     
     if (!invoice) {
-      return res.status(404).json({
+      return res.status(404).json({ 
         success: false,
-        message: 'Invoice not found'
+        message: 'Invoice not found or you do not have permission to access it' 
       });
     }
     
-    res.json({
+    res.status(200).json({
       success: true,
-      message: 'Invoice deleted successfully',
       data: invoice
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(500).json({ 
       success: false,
-      message: 'Error deleting invoice',
-      error: error.message
+      message: 'Error fetching invoice',
+      error: error.message 
     });
   }
 });
-router.get('/dashboard/stats', async (req, res) => {
-  try {
-    const totalInvoices = await Invoice.countDocuments();
-    const paidInvoices = await Invoice.countDocuments({ status: 'paid' });
-    const pendingInvoices = await Invoice.countDocuments({ status: 'pending' });
-    const overdueInvoices = await Invoice.countDocuments({ status: 'overdue' });
-    
-    const revenueData = await Invoice.aggregate([
-      { $match: { status: 'paid' } },
-      { $group: { _id: null, total: { $sum: '$total' } } }
-    ]);
-    
-    const pendingData = await Invoice.aggregate([
-      { $match: { status: 'pending' } },
-      { $group: { _id: null, total: { $sum: '$total' } } }
-    ]);
-    
-    const overdueData = await Invoice.aggregate([
-      { $match: { status: 'overdue' } },
-      { $group: { _id: null, total: { $sum: '$total' } } }
-    ]);
-    
-    const totalClients = await Client.countDocuments();
-    
-    res.json({
-      success: true,
-      data: {
-        totalInvoices,
-        paidInvoices,
-        pendingInvoices,
-        overdueInvoices,
-        totalRevenue: revenueData[0]?.total || 0,
-        pendingAmount: pendingData[0]?.total || 0,
-        overdueAmount: overdueData[0]?.total || 0,
-        totalClients
+
+// Update invoice - with ownership check
+router.put(
+  "/invoice/update/:id",
+  upload.fields([
+    { name: "signature", maxCount: 1 },
+    { name: "companyStamp", maxCount: 1 }
+  ]),
+  async (req, res) => {
+    try {
+      const invoiceId = req.params.id;
+
+      // Check invoice exists AND belongs to user
+      const invoice = await Invoice.findOne({ 
+        _id: invoiceId, 
+        userId: req.user.userId 
+      });
+      
+      if (!invoice) {
+        return res.status(404).json({
+          success: false,
+          message: "Invoice not found or you do not have permission to update it"
+        });
       }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching dashboard stats',
-      error: error.message
-    });
-  }
-});
-router.get('/dashboard/revenue-chart', async (req, res) => {
-  try {
-    const { year = new Date().getFullYear() } = req.query;
-    
-    const monthlyRevenue = await Invoice.aggregate([
-      {
-        $match: {
-          status: 'paid',
-          paidDate: {
-            $gte: new Date(`${year}-01-01`),
-            $lte: new Date(`${year}-12-31`)
-          }
+
+      let updatedData = { ...req.body };
+      
+      // Prevent userId from being modified
+      delete updatedData.userId;
+
+      // Handle items JSON (if sent)
+      if (req.body.items) {
+        try {
+          updatedData.items = JSON.parse(req.body.items);
+        } catch (err) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid items JSON"
+          });
         }
-      },
-      {
-        $group: {
-          _id: { $month: '$paidDate' },
-          revenue: { $sum: '$total' },
-          count: { $sum: 1 }
+      }
+
+      // Validate clientId ownership if updating
+      if (req.body.clientId) {
+        const client = await Client.findOne({ 
+          _id: req.body.clientId, 
+          userId: req.user.userId 
+        });
+        
+        if (!client) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid Client ID or you do not have permission to use it"
+          });
         }
-      },
-      { $sort: { _id: 1 } }
-    ]);
-    
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const chartData = months.map((month, index) => {
-      const data = monthlyRevenue.find(item => item._id === index + 1);
-      return {
-        month,
-        revenue: data?.revenue || 0,
-        invoices: data?.count || 0
-      };
-    });
-    
-    res.json({
-      success: true,
-      data: chartData
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching revenue chart data',
-      error: error.message
-    });
-  }
-});
-router.get('/dashboard/recent-invoices', async (req, res) => {
-  try {
-    const { limit = 5 } = req.query;
-    
-    const recentInvoices = await Invoice.find()
-      .populate('clientId', 'firstName lastName businessName')
-      .populate('tax.taxId', 'title percentage')
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit));
-    
-    res.json({
-      success: true,
-      data: recentInvoices
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching recent invoices',
-      error: error.message
-    });
-  }
-});
-router.post('/tax/add', async (req, res) => {
-  try {
-    const { title, percentage } = req.body;
-    
-    if (!title || percentage === undefined) {
-      return res.status(400).json({
+      }
+
+      // Validate TAX ID ownership if updating
+      if (req.body.tax) {
+        const taxRecord = await TAX.findOne({ 
+          _id: req.body.tax, 
+          userId: req.user.userId 
+        });
+        
+        if (!taxRecord) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid TAX ID or you do not have permission to use it"
+          });
+        }
+      }
+
+      // File uploads
+      if (req.files["signature"]) {
+        updatedData.signature = req.files["signature"][0].path;
+      }
+
+      if (req.files["companyStamp"]) {
+        updatedData.companyStamp = req.files["companyStamp"][0].path;
+      }
+
+      const updatedInvoice = await Invoice.findByIdAndUpdate(
+        invoiceId,
+        updatedData,
+        { new: true, runValidators: true }
+      )
+        .populate("clientId", "firstName lastName businessName email")
+        .populate("tax", "title percentage");
+
+      res.status(200).json({
+        success: true,
+        message: "Invoice updated successfully",
+        data: updatedInvoice
+      });
+
+    } catch (error) {
+      res.status(500).json({
         success: false,
-        message: 'Title and percentage are required'
+        message: "Error updating invoice",
+        error: error.message
       });
     }
-    
-    const tax = new TAX({
-      title,
-      percentage
-    });
-    
-    await tax.save();
-    
-    res.status(201).json({
-      success: true,
-      message: 'Tax created successfully',
-      data: tax
-    });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: 'Error creating tax',
-      error: error.message
-    });
   }
-});
+);
 
-router.get('/tax/access', async (req, res) => {
+// Delete invoice - with ownership check
+router.delete("/invoice/delete/:id", async (req, res) => {
   try {
-    const taxes = await TAX.find().sort({ createdAt: -1 });
-    
-    res.json({
-      success: true,
-      data: taxes
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching taxes',
-      error: error.message
-    });
-  }
-});
+    const invoiceId = req.params.id;
 
-router.get('/tax/:id', async (req, res) => {
-  try {
-    const tax = await TAX.findById(req.params.id);
-    
-    if (!tax) {
+    const invoice = await Invoice.findOneAndDelete({ 
+      _id: invoiceId, 
+      userId: req.user.userId  // ← Ownership check
+    });
+
+    if (!invoice) {
       return res.status(404).json({
         success: false,
-        message: 'Tax not found'
+        message: "Invoice not found or you do not have permission to delete it"
       });
     }
-    
-    res.json({
+
+    return res.status(200).json({
       success: true,
-      data: tax
+      message: "Invoice deleted successfully",
+      data: invoice
     });
+
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: 'Error fetching tax',
+      message: "Error deleting invoice",
       error: error.message
     });
   }
 });
-
-router.put('/tax/update/:id', async (req, res) => {
-  try {
-    const { title, percentage } = req.body;
-    
-    const tax = await TAX.findByIdAndUpdate(
-      req.params.id,
-      { title, percentage },
-      { new: true, runValidators: true }
-    );
-    
-    if (!tax) {
-      return res.status(404).json({
-        success: false,
-        message: 'Tax not found'
-      });
-    }
-    
-    res.json({
-      success: true,
-      message: 'Tax updated successfully',
-      data: tax
-    });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: 'Error updating tax',
-      error: error.message
-    });
-  }
-});
-
-
-router.delete('/tax/delete/:id', async (req, res) => {
-  try {
-    const tax = await TAX.findByIdAndDelete(req.params.id);
-    
-    if (!tax) {
-      return res.status(404).json({
-        success: false,
-        message: 'Tax not found'
-      });
-    }
-    
-    res.json({
-      success: true,
-      message: 'Tax deleted successfully',
-      data: tax
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting tax',
-      error: error.message
-    });
-  }
-Tax});
 
 module.exports = router;

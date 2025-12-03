@@ -61,7 +61,7 @@ const authenticateToken = (req, res, next) => {
           message: 'Token expired'
         });
       } else {
-        
+        // Other errors (invalid signature, malformed token, etc.)
         return res.status(403).json({ 
           success: false,
           message: 'Invalid token'

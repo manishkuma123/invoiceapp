@@ -11,7 +11,6 @@ function generateOTP() {
   return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
-
 async function sendOTPEmail(email, otp, purpose) {
   const subject = purpose === 'signup' 
     ? 'Your OTP for Signup - Invoice App' 
@@ -393,6 +392,7 @@ router.post('/login/verify-otp', async (req, res) => {
     if (user.hasCompletedOrgSetup) {
       const organization = await Organization.findOne({ userId: user._id })
         .populate('businessType', 'name');
+    
       
       if (organization) {
         organizationData = {
@@ -411,8 +411,8 @@ router.post('/login/verify-otp', async (req, res) => {
       }
     }
 
-    console.log(`✅ User logged in: ${email}`);
-
+    // console.log(`✅ User logged in: ${email}`);
+// console.log(rganizationData)
     res.status(200).json({
       success: true,
       message: 'Login successful',

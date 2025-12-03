@@ -10,6 +10,13 @@ const taxSchema = new mongoose.Schema({
     type: Number, 
     required: true 
   },
+ userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true
+  },
+
   createdAt: { 
     type: Date, 
     default: Date.now 
