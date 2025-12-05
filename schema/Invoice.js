@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const InvoiceSchema = new mongoose.Schema(
   {  
-    invoiceType: { type: String },
+    // invoiceType: { type: String },
     invoiceNumber: { type: String, unique: true, required: true },
     // invoiceNumber: { type: String,  required: true },
     clientId: {
@@ -20,7 +20,7 @@ const InvoiceSchema = new mongoose.Schema(
     subject: { type: String, default: '' },
     invoiceDate: { type: Date, default: Date.now },
     dueDate: { type: Date },
-    itemType: {
+   invoiceType: {
     type: String,
     enum: ['Hourly', 'Fixed', 'Quantity Based'],
     required: true
