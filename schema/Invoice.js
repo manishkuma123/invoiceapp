@@ -3,8 +3,8 @@ const mongoose = require('mongoose');
 const InvoiceSchema = new mongoose.Schema(
   {  
     invoiceType: { type: String },
-    // invoiceNumber: { type: String, unique: true, required: true },
-    invoiceNumber: { type: String,  required: true },
+    invoiceNumber: { type: String, unique: true, required: true },
+    // invoiceNumber: { type: String,  required: true },
     clientId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Client',
