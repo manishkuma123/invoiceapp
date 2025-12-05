@@ -1,9 +1,10 @@
 const mongoose = require('mongoose');
 
 const InvoiceSchema = new mongoose.Schema(
-  {
+  {  
     invoiceType: { type: String },
-    invoiceNumber: { type: String, unique: true, required: true },
+    // invoiceNumber: { type: String, unique: true, required: true },
+    invoiceNumber: { type: String,  required: true },
     clientId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Client',
@@ -19,20 +20,40 @@ const InvoiceSchema = new mongoose.Schema(
     subject: { type: String, default: '' },
     invoiceDate: { type: Date, default: Date.now },
     dueDate: { type: Date },
-    items: [
-      {
-        description: { type: String },
-        quantity: { type: Number },
-     
-        itemDiscount: { type: Number, default: 0 }, 
+    itemType: {
+    type: String,
+    enum: ['Hourly', 'Fixed', 'Quantity Based'],
+    required: true
+  },
+  
+  items: [
+    {
+
+      itemDetails: { type: String},
       
-      }
-    ],
+
+      totalCost: { type: Number },
+      
+     
+      totalHours: { type: Number },
+      hourlyRate: { type: Number },
+      
+      // Quantity Based type: Total Quantity, Per Quantity, Total
+      totalQuantity: { type: Number },
+      perQuantity: { type: Number },
+      
+      // Total field (for Hourly and Quantity Based)
+      total: { type: Number }
+    }
+  ],
+  
+  
     total: { type: Number, default: 0 },      
     discountAmount: { type: Number, default: 0 },
     tax: {
      type: mongoose.Schema.Types.ObjectId, ref: 'TAX', default: null 
     },
+    taxvalue:{type:String},
     roundOff: { type: Number, default: 0 },
     totalamount: { type: Number, default: 0 },
     currency: { type: String, default: 'INR' },
