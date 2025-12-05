@@ -908,7 +908,7 @@ router.post("/invoice/add", upload.fields([
     } = req.body;
 
     // Basic validation
-    if (!itemType || !items) {
+    if (!items) {
       return res.status(400).json({
         success: false,
         message: "Client ID, item type, and items are required"
@@ -1672,7 +1672,3 @@ router.delete("/invoice/delete/:id", async (req, res) => {
 });
 
 module.exports = router;
-
-
-
-
