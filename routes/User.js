@@ -4,12 +4,85 @@ const jwt = require('jsonwebtoken');
 const sgMail = require('@sendgrid/mail');
 const User = require('../schema/User');
 const OTP = require('../schema/Otp');
+const nodemailer = require('nodemailer');
 const Organization = require('../schema/organization');
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 function generateOTP() {
   return Math.floor(1000 + Math.random() * 9000).toString();
 }
+
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+// async function sendOTPEmail(email, otp, purpose) {
+//   const subject = purpose === 'signup' 
+//     ? 'Your OTP for Signup - Invoice App' 
+//     : 'Your OTP for Login - Invoice App';
+    
+//   const title = purpose === 'signup' 
+//     ? 'Welcome! Complete Your Signup' 
+//     : 'Login Verification';
+  
+//   const msg = {
+//     to: email,
+//     from: process.env.SENDGRID_FROM_EMAIL,
+//     subject: subject,
+//     html: `
+//       <!DOCTYPE html>
+//       <html>
+//       <head>
+//         <style>
+//           body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+//           .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+//           .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; color: white; }
+//           .content { padding: 40px; }
+//           .otp-box { background-color: #f8f9fa; border: 2px dashed #667eea; border-radius: 8px; padding: 20px; text-align: center; margin: 30px 0; }
+//           .otp-code { font-size: 36px; font-weight: bold; color: #667eea; letter-spacing: 8px; margin: 10px 0; }
+//           .footer { background-color: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px; }
+//           .note { color: #666; font-size: 14px; margin-top: 20px; }
+//         </style>
+//       </head>
+//       <body>
+//         <div class="container">
+//           <div class="header">
+//             <h1>Invoice App</h1>
+//             <p>${title}</p>
+//           </div>
+//           <div class="content">
+//             <p>Hello,</p>
+//             <p>Your One-Time Password (OTP) for ${purpose === 'signup' ? 'completing your signup' : 'logging in'} is:</p>
+//             <div class="otp-box">
+//               <div class="otp-code">${otp}</div>
+//             </div>
+//             <p class="note">
+//               ⏱️ This code will expire in <strong>10 minutes</strong>.<br>
+//               🔒 For security reasons, please do not share this code with anyone.<br>
+//               ❓ If you didn't request this code, please ignore this email.
+//             </p>
+//           </div>
+//         </div>
+//       </body>
+//       </html>
+//     `
+//   };
+
+//   try {
+//     await sgMail.send(msg);
+//     console.log(`✅ OTP email sent to ${email}`);
+//     return true;
+//   } catch (error) {
+//     console.error('❌ SendGrid email error:', error);
+//     if (error.response) {
+//       console.error('SendGrid error details:', error.response.body);
+//     }
+//     return false;
+//   }
+// }
 
 async function sendOTPEmail(email, otp, purpose) {
   const subject = purpose === 'signup' 
@@ -19,10 +92,10 @@ async function sendOTPEmail(email, otp, purpose) {
   const title = purpose === 'signup' 
     ? 'Welcome! Complete Your Signup' 
     : 'Login Verification';
-  
-  const msg = {
+
+  const mailOptions = {
+    from: `"Invoice App" <${process.env.EMAIL_USER}>`,
     to: email,
-    from: process.env.SENDGRID_FROM_EMAIL,
     subject: subject,
     html: `
       <!DOCTYPE html>
@@ -64,14 +137,11 @@ async function sendOTPEmail(email, otp, purpose) {
   };
 
   try {
-    await sgMail.send(msg);
-    console.log(`✅ OTP email sent to ${email}`);
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✅ OTP email sent to ${email} | ID: ${info.messageId}`);
     return true;
   } catch (error) {
-    console.error('❌ SendGrid email error:', error);
-    if (error.response) {
-      console.error('SendGrid error details:', error.response.body);
-    }
+    console.error('❌ Nodemailer email error:', error.message);
     return false;
   }
 }
